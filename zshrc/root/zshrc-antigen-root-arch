@@ -1,0 +1,13 @@
+# source /home/test/antigen.zsh
+source ~/.repos/externalgit/antigen/antigen.zsh
+
+# Load the oh-my-zsh's library.
+antigen use oh-my-zsh
+antigen init .zshrc-common
+antigen bundle archlinux
+
+# Load the theme.
+antigen theme afowler
+
+# Tell Antigen that you're done.
+antigen apply

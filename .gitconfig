@@ -1,0 +1,12 @@
+[user]
+	email = allmightyroot@gmail.com
+	name = Chris Beason
+	signingkey = 0x2F580F2D4315F522
+[push]
+	default = simple
+[core]
+	editor = vim
+[alias]
+	up = pull --rebase --autostash
+[init]
+	defaultBranch = main

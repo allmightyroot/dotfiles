@@ -1,0 +1,28 @@
+# source /home/test/antigen.zsh
+source /opt/homebrew/opt/antigen/share/antigen/antigen.zsh
+
+# Load the oh-my-zsh's library.
+antigen use oh-my-zsh
+antigen init ~/.zshrc-common
+antigen bundle 1password
+antigen bundle brew
+antigen bundle macos
+antigen bundle gnu-utils
+
+# My stuff
+antigen bundle allmightyroot/zshdotfiles.mac@main
+
+# Load the theme.
+antigen theme afowler
+
+# Tell Antigen that you're done.
+antigen apply
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init --path)"
+
+source /opt/homebrew/bin/virtualenvwrapper.sh
+neofetch
+
+[[ "$TERM_PROGRAM" == "vscode" ]] && . "$(code --locate-shell-integration-path zsh)"
+

@@ -1,0 +1,59 @@
+# Bundles from the default repo (robbyrussell's oh-my-zsh).
+antigen bundle aliasfinder
+antigen bundle ansible
+antigen bundle autojump
+antigen bundle catimg
+antigen bundle colored-man-pages
+antigen bundle colorize
+antigen bundle command-not-found
+antigen bundle common-aliases
+antigen bundle copybuffer
+antigen bundle copyfile
+antigen bundle copypath
+antigen bundle cp
+antigen bundle dirhistory
+antigen bundle docker
+antigen bundle dotenv
+antigen bundle emoji
+antigen bundle extract
+antigen bundle firewalld
+antigen bundle git
+antigen bundle github
+antigen bundle gitignore
+antigen bundle history
+antigen bundle isodate
+antigen bundle jump
+antigen bundle nmap
+antigen bundle per-directory-history
+antigen bundle pip
+antigen bundle pyenv
+antigen bundle rsync
+antigen bundle screen
+antigen bundle ssh-agent
+antigen bundle sudo
+antigen bundle systemadmin
+antigen bundle systemd
+antigen bundle taskwarrior
+antigen bundle tmux
+antigen bundle tmuxinator
+antigen bundle ubuntu
+antigen bundle vagrant
+antigen bundle vault
+antigen bundle vim-interaction
+antigen bundle vscode
+antigen bundle wd
+antigen bundle web-search
+antigen bundle z 
+antigen bundle zsh-navigation-tools
+
+
+# Syntax highlighting bundle.
+# antigen bundle djui/alias-tips
+# antigen bundle sparsick/ansible-zsh                                                                   
+# antigen bundle zsh-users/zsh-autosuggestions
+# antigen bundle zsh-users/zsh-completions
+# antigen bundle zsh-users/zsh-syntax-highlighting
+
+
+# My stuff
+#antigen bundle allmightyroot/zshdotfiles@main
