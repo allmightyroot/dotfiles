@@ -11,10 +11,10 @@ export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
 export INSTALL_ZSH=true
 export USERNAME=`whoami`
-
+export DOTFILESHOME=/workspaces/.codespaces/.persistedshare/dotfiles
 ## update and install my usual packages (minus some that aren't needed in codespaces)
 sudo apt-get update
-sudo apt-get -y install --no-install-recommends apt-utils dialog 2>&1
+sudo apt-get -y install --no-install-recommends apt-utils 2>&1
 sudo apt-get install -y \
   curl \
   dstat \
@@ -42,8 +42,8 @@ if [ "$INSTALL_ZSH" = "true" ]
 then
 
 
-    cp -f ~/dotfiles/zshrc/.zshrc ~/.zshrc
-    cp -f ~/dotfiles/zshrc/.zshrc-antigen-common ~/.zshrc-common
+    cp -f $DOTFILESHOME/zshrc/zshrc-antigen-ubuntu ~/.zshrc
+    cp -f $DOTFILESHOME/zshrc/zshrc-antigen-common ~/.zshrc-common
     mkdir -p ~/.repos/externalgit
     pushd `pwd`
     cd ~/.repos/externalgit
