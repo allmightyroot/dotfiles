@@ -42,7 +42,8 @@ sudo apt-get install -y \
 if [ "$INSTALL_ZSH" = "true" ]
 then
 
-
+    cp -f $DOTFILESHOME/.bash_profile ~/.bash_profile
+    cp -f $DOTFILESHOME/.bashrc ~/.bashrc
     cp -f $DOTFILESHOME/zshrc/zshrc-antigen-ubuntu ~/.zshrc
     cp -f $DOTFILESHOME/zshrc/zshrc-antigen-common ~/.zshrc-common
     mkdir -p ~/.repos/externalgit
