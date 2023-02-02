@@ -16,6 +16,7 @@ export DOTFILESHOME=/workspaces/.codespaces/.persistedshare/dotfiles
 sudo apt-get update
 sudo apt-get -y install --no-install-recommends apt-utils 2>&1
 sudo apt-get install -y \
+  autojump \
   curl \
   dstat \
   git \
@@ -49,7 +50,7 @@ then
     cd ~/.repos/externalgit
     git clone https://github.com/zsh-users/antigen.git
     popd
-    chsh -s /usr/bin/zsh $USERNAME
+#    chsh -s /usr/bin/zsh $USERNAME
 fi
 
 # Cleanup
