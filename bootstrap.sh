@@ -5,13 +5,26 @@
 # Sources of inspiration: 
 # https://www.huuhka.net/personalizing-your-github-codespaces/
 # https://bea.stollnitz.com/blog/codespaces-terminal/
+# https://github.com/axonasif/dotsh
 
 
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
 export INSTALL_ZSH=true
 export USERNAME=`whoami`
-export DOTFILESHOME=/workspaces/.codespaces/.persistedshare/dotfiles
+
+
+
+function is::gitpod () 
+{ 
+    test -e /usr/bin/gp && test -v GITPOD_REPO_ROOT
+};
+function is::codespaces () 
+{ 
+    test -v CODESPACES || test -e /home/codespaces
+};
+
+
 ## update and install my usual packages (minus some that aren't needed in codespaces)
 sudo apt-get update
 sudo apt-get -y install --no-install-recommends apt-utils 2>&1
@@ -38,21 +51,51 @@ sudo apt-get install -y \
   unzip \
   vim-nox
 
-# Install & Configure Zsh
-if [ "$INSTALL_ZSH" = "true" ]
-then
+if is::gitpod; then
+    { 
+       DOTFILESHOME=/home/gitpod/.dotfiles
+       # Install & Configure Zsh
+      if [ "$INSTALL_ZSH" = "true" ]
+      then
 
-    cp -f $DOTFILESHOME/.bash_profile ~/.bash_profile
-    cp -f $DOTFILESHOME/.bashrc ~/.bashrc
-    cp -f $DOTFILESHOME/zshrc/zshrc-antigen-ubuntu ~/.zshrc
-    cp -f $DOTFILESHOME/zshrc/zshrc-antigen-common ~/.zshrc-common
-    mkdir -p ~/.repos/externalgit
-    pushd `pwd`
-    cd ~/.repos/externalgit
-    git clone https://github.com/zsh-users/antigen.git
-    popd
-#    chsh -s /usr/bin/zsh $USERNAME
+          cp -f $DOTFILESHOME/.bash_profile ~/.bash_profile
+          cp -f $DOTFILESHOME/.bashrc ~/.bashrc
+          cp -f $DOTFILESHOME/zshrc/zshrc-antigen-ubuntu ~/.zshrc
+          cp -f $DOTFILESHOME/zshrc/zshrc-antigen-common ~/.zshrc-common
+          mkdir -p ~/.repos/externalgit
+          pushd `pwd`
+          cd ~/.repos/externalgit
+          git clone https://github.com/zsh-users/antigen.git
+          popd
+      #    chsh -s /usr/bin/zsh $USERNAME
+      fi 
+
+    };
 fi
+
+if is::codespaces; then
+    { 
+       DOTFILESHOME=DOTFILESHOME=/workspaces/.codespaces/.persistedshare/dotfiles
+       # Install & Configure Zsh
+      if [ "$INSTALL_ZSH" = "true" ]
+      then
+
+          cp -f $DOTFILESHOME/.bash_profile ~/.bash_profile
+          cp -f $DOTFILESHOME/.bashrc ~/.bashrc
+          cp -f $DOTFILESHOME/zshrc/zshrc-antigen-ubuntu ~/.zshrc
+          cp -f $DOTFILESHOME/zshrc/zshrc-antigen-common ~/.zshrc-common
+          mkdir -p ~/.repos/externalgit
+          pushd `pwd`
+          cd ~/.repos/externalgit
+          git clone https://github.com/zsh-users/antigen.git
+          popd
+      #    chsh -s /usr/bin/zsh $USERNAME
+      fi 
+
+    };
+fi
+
+
 
 # Cleanup
 sudo apt-get autoremove -y
