@@ -30,6 +30,7 @@ sudo apt-get update
 sudo apt-get -y install --no-install-recommends apt-utils 2>&1
 sudo apt-get install -y \
   autojump \
+  byobu \
   curl \
   dstat \
   git \
@@ -47,6 +48,7 @@ sudo apt-get install -y \
   python3-pip \
   python3-virtualenv \
   sudo \
+  tmux \
   wget \
   unzip \
   vim-nox
@@ -75,7 +77,7 @@ fi
 
 if is::codespaces; then
     { 
-       DOTFILESHOME=DOTFILESHOME=/workspaces/.codespaces/.persistedshare/dotfiles
+       DOTFILESHOME=/workspaces/.codespaces/.persistedshare/dotfiles
        # Install & Configure Zsh
       if [ "$INSTALL_ZSH" = "true" ]
       then
