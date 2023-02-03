@@ -70,7 +70,7 @@ if is::gitpod; then
           cd ~/.repos/externalgit
           git clone https://github.com/zsh-users/antigen.git
           popd
-      #    chsh -s /usr/bin/zsh $USERNAME
+          sudo chsh -s /usr/bin/zsh $USERNAME
       fi 
 
     };
@@ -92,7 +92,7 @@ if is::codespaces; then
           cd ~/.repos/externalgit
           git clone https://github.com/zsh-users/antigen.git
           popd
-      #    chsh -s /usr/bin/zsh $USERNAME
+          sudo chsh -s /usr/bin/zsh $USERNAME
       fi 
 
     };
