@@ -66,6 +66,8 @@ if is::gitpod; then
           cp -f $DOTFILESHOME/zshrc/zshrc-antigen-ubuntu ~/.zshrc
           cp -f $DOTFILESHOME/zshrc/zshrc-antigen-common ~/.zshrc-common
           mkdir -p ~/.repos/externalgit
+          mkdir -p ~/.ssh
+          cp -f $DOTFILESHOME/ssh-config ~/.ssh/config
           pushd `pwd`
           cd ~/.repos/externalgit
           git clone https://github.com/zsh-users/antigen.git
@@ -88,6 +90,8 @@ if is::codespaces; then
           cp -f $DOTFILESHOME/zshrc/zshrc-antigen-ubuntu ~/.zshrc
           cp -f $DOTFILESHOME/zshrc/zshrc-antigen-common ~/.zshrc-common
           mkdir -p ~/.repos/externalgit
+          mkdir -p ~/.ssh
+          cp -f $DOTFILESHOME/ssh-config ~/.ssh/config
           pushd `pwd`
           cd ~/.repos/externalgit
           git clone https://github.com/zsh-users/antigen.git
