@@ -27,6 +27,7 @@ function is::codespaces ()
 
 ## update and install my usual packages (minus some that aren't needed in codespaces)
 sudo apt-get update
+sudo apt-get upgrade
 sudo apt-get -y install --no-install-recommends apt-utils 2>&1
 sudo apt-get install -y \
   autojump \
