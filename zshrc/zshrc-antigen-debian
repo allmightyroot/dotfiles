@@ -3,7 +3,7 @@ source ~/.repos/externalgit/antigen/antigen.zsh
 
 # Load the oh-my-zsh's library.
 antigen use oh-my-zsh
-antigen init .zshrc-common
+antigen init ~/.zshrc-common
 antigen bundle debian
 
 # Load the theme.
