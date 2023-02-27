@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # .bashrc
 
 # Source global definitions

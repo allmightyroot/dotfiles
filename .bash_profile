@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # .bash_profile
 
 # Get the aliases and functions
