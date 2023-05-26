@@ -29,7 +29,7 @@ function is::codespaces ()
 sudo apt-get update
 # sudo apt-get upgrade
 sudo apt-get -y install --no-install-recommends apt-utils 2>&1
-sudo apt-get install -y \
+sudo apt-get install -o Dpkg::Options::="--force-confnew" -fuyq \
   autojump \
   byobu \
   curl \
