@@ -1,0 +1,40 @@
+# ~/.zshrc
+
+# Clone antidote if necessary.
+[[ -e ${ZDOTDIR:-~}/.antidote ]] ||
+  git clone https://github.com/mattmc3/antidote.git ${ZDOTDIR:-~}/.antidote
+
+# Source antidote.
+source ${ZDOTDIR:-~}/.antidote/antidote.zsh
+
+# Initialize antidote's dynamic mode, which changes `antidote bundle`
+# from static mode.
+source <(antidote init)
+
+# Initialize compinit (for compdef to work)
+autoload -Uz compinit
+compinit
+
+# Load the oh-my-zsh's library and OS Specific plugins
+antidote bundle ohmyzsh/ohmyzsh path:lib
+# antidote bundle ohmyzsh/ohmyzsh path:plugins/brew
+antidote bundle ohmyzsh/ohmyzsh path:plugins/archlinux
+
+# My stuff
+#antidote bundle allmightyroot/zshdotfiles@main
+
+# Load the theme
+antidote bundle ohmyzsh/ohmyzsh path:themes/afowler.zsh-theme
+# antidote bundle ohmyzsh/ohmyzsh path:themes/robbyrussell.zsh-theme
+
+# Load plugins
+antidote bundle <~/.zsh_plugins.txt >~/.zsh_plugins.zsh
+antidote load
+
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+source /usr/bin/virtualenvwrapper.sh
+fastfetch
+
+[[ "$TERM_PROGRAM" == "vscode" ]] && . "$(code --locate-shell-integration-path zsh)"
+
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
