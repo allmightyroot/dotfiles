@@ -31,9 +31,9 @@ antidote bundle ohmyzsh/ohmyzsh path:themes/afowler.zsh-theme
 antidote bundle <~/.zsh_plugins.txt >~/.zsh_plugins.zsh
 antidote load
 
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-source /usr/bin/virtualenvwrapper.sh
-fastfetch
+# eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+source /usr/share/virtualenvwrapper/virtualenvwrapper.sh
+# fastfetch
 
 [[ "$TERM_PROGRAM" == "vscode" ]] && . "$(code --locate-shell-integration-path zsh)"
 
