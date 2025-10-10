@@ -16,7 +16,7 @@ fi
 source ~/.zsh_plugins.zsh
 
 # Alias to regenerate static plugin file
-alias antidote-update='source ${ZDOTDIR:-~}/.antidote/antidote.zsh && antidote bundle <${ZDOTDIR:-~}/.zsh_plugins_distro.txt >${ZDOTDIR:-~}/.zsh_plugins.zsh && echo "Plugins regenerated! Restart your shell or run: source ~/.zshrc"'
+alias antidote-update='source ${ZDOTDIR:-~}/.antidote/antidote.zsh && antidote bundle <${ZDOTDIR:-~}/.zsh_plugins.txt >${ZDOTDIR:-~}/.zsh_plugins.zsh && echo "Plugins regenerated! Restart your shell or run: source ~/.zshrc"'
 
 # Lazy-load virtualenvwrapper - only loads when you actually use it
 if [[ -f /usr/share/virtualenvwrapper/virtualenvwrapper.sh ]]; then
