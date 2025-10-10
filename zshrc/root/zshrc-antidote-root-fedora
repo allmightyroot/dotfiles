@@ -1,0 +1,25 @@
+# ~/.zshrc (root)
+
+# Clone antidote if necessary.
+[[ -e ${ZDOTDIR:-~}/.antidote ]] ||
+  git clone https://github.com/mattmc3/antidote.git ${ZDOTDIR:-~}/.antidote
+
+# Source antidote.
+source ${ZDOTDIR:-~}/.antidote/antidote.zsh
+
+# Initialize antidote's dynamic mode
+source <(antidote init)
+
+# Initialize compinit
+autoload -Uz compinit
+compinit
+
+# Load oh-my-zsh library and OS specific plugins
+antidote bundle ohmyzsh/ohmyzsh path:lib
+antidote bundle ohmyzsh/ohmyzsh path:plugins/dnf
+
+# Load the theme
+antidote bundle ohmyzsh/ohmyzsh path:themes/afowler.zsh-theme
+
+# Load plugins
+antidote load
