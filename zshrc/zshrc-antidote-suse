@@ -4,37 +4,42 @@
 [[ -e ${ZDOTDIR:-~}/.antidote ]] ||
   git clone https://github.com/mattmc3/antidote.git ${ZDOTDIR:-~}/.antidote
 
-# Source antidote.
-source ${ZDOTDIR:-~}/.antidote/antidote.zsh
-
-# Initialize antidote's dynamic mode, which changes `antidote bundle`
-# from static mode.
-source <(antidote init)
-
-# Initialize compinit (for compdef to work)
+# Optimized compinit - only run once per day
 autoload -Uz compinit
-compinit
+if [[ -n ${ZDOTDIR:-~}/.zcompdump(#qN.mh+24) ]]; then
+  compinit
+else
+  compinit -C
+fi
 
-# Load the oh-my-zsh's library and OS Specific plugins
-antidote bundle ohmyzsh/ohmyzsh path:lib
-# antidote bundle ohmyzsh/ohmyzsh path:plugins/brew
-antidote bundle ohmyzsh/ohmyzsh path:plugins/suse
+# Load all plugins from static file
+source ~/.zsh_plugins.zsh
 
-# My stuff
-#antidote bundle allmightyroot/zshdotfiles@main
+# Alias to regenerate static plugin file
+alias antidote-update='source ${ZDOTDIR:-~}/.antidote/antidote.zsh && antidote bundle <${ZDOTDIR:-~}/.zsh_plugins_distro.txt >${ZDOTDIR:-~}/.zsh_plugins.zsh && echo "Plugins regenerated! Restart your shell or run: source ~/.zshrc"'
 
-# Load the theme
-antidote bundle ohmyzsh/ohmyzsh path:themes/afowler.zsh-theme
-# antidote bundle ohmyzsh/ohmyzsh path:themes/robbyrussell.zsh-theme
+# Lazy-load virtualenvwrapper - only loads when you actually use it
+if [[ -f /usr/bin/virtualenvwrapper.sh ]]; then
+  export WORKON_HOME=$HOME/.virtualenvs
+  export PROJECT_HOME=$HOME/projects
 
-# Load plugins
-antidote bundle <~/.zsh_plugins.txt >~/.zsh_plugins.zsh
-antidote load
+  for cmd in workon mkvirtualenv rmvirtualenv deactivate lsvirtualenv; do
+    eval "$cmd() {
+      unset -f workon mkvirtualenv rmvirtualenv deactivate lsvirtualenv
+      source /usr/bin/virtualenvwrapper.sh
+      \$cmd \"\$@\"
+    }"
+  done
+fi
 
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-source /usr/bin/virtualenvwrapper.sh
-fastfetch
+# Lazy-load homebrew if installed
+if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+fi
 
-[[ "$TERM_PROGRAM" == "vscode" ]] && . "$(code --locate-shell-integration-path zsh)"
+# Conditional integrations
+[[ "$TERM_PROGRAM" == "vscode" ]] && command -v code &>/dev/null && . "$(code --locate-shell-integration-path zsh)"
+[[ -e "${HOME}/.iterm2_shell_integration.zsh" ]] && source "${HOME}/.iterm2_shell_integration.zsh"
 
-test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+# Optional: Run fastfetch only in interactive shells
+[[ -o interactive ]] && command -v fastfetch &>/dev/null && fastfetch
