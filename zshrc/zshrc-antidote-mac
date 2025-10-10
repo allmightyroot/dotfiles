@@ -13,7 +13,7 @@ compinit
 source ~/.zsh_plugins.zsh
 
 # Alias to regenerate static plugin file
-alias antidote-update='source ${ZDOTDIR:-~}/.antidote/antidote.zsh && antidote bundle <${ZDOTDIR:-~}/.zsh_plugins_mac.txt >${ZDOTDIR:-~}/.zsh_plugins.zsh && echo "Plugins regenerated! Restart your shell or run: source ~/.zshrc"'
+alias antidote-update='source ${ZDOTDIR:-~}/.antidote/antidote.zsh && antidote bundle <${ZDOTDIR:-~}/.zsh_plugins.txt >${ZDOTDIR:-~}/.zsh_plugins.zsh && echo "Plugins regenerated! Restart your shell or run: source ~/.zshrc"'
 
 # Additional configurations
 if [[ -f /opt/homebrew/bin/virtualenvwrapper.sh ]]; then
