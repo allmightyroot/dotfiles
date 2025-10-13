@@ -5,6 +5,10 @@
 [[ -e ${ZDOTDIR:-~}/.antidote ]] ||
   git clone https://github.com/mattmc3/antidote.git ${ZDOTDIR:-~}/.antidote
 
+# Source antidote.
+source ${ZDOTDIR:-~}/.antidote/antidote.zsh
+
+
 # Initialize compinit (for compdef to work)
 autoload -Uz compinit
 compinit
