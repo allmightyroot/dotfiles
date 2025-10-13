@@ -3,7 +3,6 @@
 # Load oh-my-zsh lib first
 ohmyzsh/ohmyzsh path:lib
 ohmyzsh/ohmyzsh path:plugins/dnf
-ohmyzsh/ohmyzsh path:plugins/fedora
 
 ohmyzsh/ohmyzsh path:plugins/ansible
 ohmyzsh/ohmyzsh path:plugins/catimg
