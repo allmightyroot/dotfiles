@@ -4,6 +4,10 @@
 [[ -e ${ZDOTDIR:-~}/.antidote ]] ||
   git clone https://github.com/mattmc3/antidote.git ${ZDOTDIR:-~}/.antidote
 
+# Source antidote.
+source ${ZDOTDIR:-~}/.antidote/antidote.zsh
+
+
 # Optimized compinit - only run once per day
 autoload -Uz compinit
 if [[ -n ${ZDOTDIR:-~}/.zcompdump(#qN.mh+24) ]]; then
