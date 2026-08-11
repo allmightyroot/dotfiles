@@ -4,6 +4,7 @@
 
 # Source global definitions
 if [ -f /etc/bashrc ]; then
+	# shellcheck disable=SC1091
 	. /etc/bashrc
 fi
 
@@ -16,9 +17,10 @@ export EDITOR='vim'
 # User specific aliases and functions
 alias ssh='ssh -q'
 
-if [ -z "${NOZSH}" ] && [ $TERM = "xterm" -o $TERM = "xterm-256color" -o $TERM = "screen" ] && type zsh &> /dev/null
+if [ -z "${NOZSH}" ] && { [ "$TERM" = "xterm" ] || [ "$TERM" = "xterm-256color" ] || [ "$TERM" = "screen" ]; } && type zsh &> /dev/null
 then
-    export SHELL=$(which zsh)
+    SHELL=$(which zsh)
+    export SHELL
     if [[ -o login ]]
     then
         exec zsh -l

@@ -2,7 +2,7 @@
 
 # This file is used to bootstrap a github codespaces workspace with my usual standards, etc
 # This sort of combines my usual ansible based sysprep stuff with one script
-# Sources of inspiration: 
+# Sources of inspiration:
 # https://www.huuhka.net/personalizing-your-github-codespaces/
 # https://bea.stollnitz.com/blog/codespaces-terminal/
 # https://github.com/axonasif/dotsh
@@ -11,16 +11,17 @@
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
 export INSTALL_ZSH=true
-export USERNAME=`whoami`
+USERNAME=$(whoami)
+export USERNAME
 
 
 
-function is::gitpod () 
-{ 
+function is::gitpod ()
+{
     test -e /usr/bin/gp && test -v GITPOD_REPO_ROOT
 };
-function is::codespaces () 
-{ 
+function is::codespaces ()
+{
     test -v CODESPACES || test -e /home/codespaces
 };
 
@@ -55,7 +56,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -o Dpkg::Options::="--force-
   vim-nox
 
 if is::gitpod; then
-    { 
+    {
        DOTFILESHOME=/home/gitpod/.dotfiles
        # Install & Configure Zsh
       if [ "$INSTALL_ZSH" = "true" ]
@@ -68,18 +69,18 @@ if is::gitpod; then
           mkdir -p ~/.repos/externalgit
           mkdir -p ~/.ssh
           cp -f $DOTFILESHOME/ssh-config ~/.ssh/config
-          pushd `pwd`
-          cd ~/.repos/externalgit
+          pushd "$(pwd)" || exit
+          cd ~/.repos/externalgit || exit
           git clone https://github.com/zsh-users/antigen.git
-          popd
-          sudo chsh -s /usr/bin/zsh $USERNAME
-      fi 
+          popd || exit
+          sudo chsh -s /usr/bin/zsh "$USERNAME"
+      fi
 
     };
 fi
 
 if is::codespaces; then
-    { 
+    {
        DOTFILESHOME=/workspaces/.codespaces/.persistedshare/dotfiles
        # Install & Configure Zsh
       if [ "$INSTALL_ZSH" = "true" ]
@@ -92,12 +93,12 @@ if is::codespaces; then
           mkdir -p ~/.repos/externalgit
           mkdir -p ~/.ssh
           cp -f $DOTFILESHOME/ssh-config ~/.ssh/config
-          pushd `pwd`
-          cd ~/.repos/externalgit
+          pushd "$(pwd)" || exit
+          cd ~/.repos/externalgit || exit
           git clone https://github.com/zsh-users/antigen.git
-          popd
-          sudo chsh -s /usr/bin/zsh $USERNAME
-      fi 
+          popd || exit
+          sudo chsh -s /usr/bin/zsh "$USERNAME"
+      fi
 
     };
 fi
