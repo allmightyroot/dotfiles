@@ -23,7 +23,7 @@ alias antidote-update='source ${ZDOTDIR:-~}/.antidote/antidote.zsh && antidote b
 if [[ -f /opt/homebrew/bin/virtualenvwrapper.sh ]]; then
   export WORKON_HOME=$HOME/.virtualenvs
   export PROJECT_HOME=$HOME/projects
-  
+
   # Lazy-load virtualenvwrapper - only loads when you actually use it
   for cmd in workon mkvirtualenv rmvirtualenv deactivate lsvirtualenv; do
     eval "$cmd() {
