@@ -25,4 +25,3 @@ source /opt/homebrew/bin/virtualenvwrapper.sh
 neofetch
 
 [[ "$TERM_PROGRAM" == "vscode" ]] && . "$(code --locate-shell-integration-path zsh)"
-
