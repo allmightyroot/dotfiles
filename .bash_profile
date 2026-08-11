@@ -4,6 +4,7 @@
 
 # Get the aliases and functions
 if [ -f ~/.bashrc ]; then
+	# shellcheck disable=SC1090
 	. ~/.bashrc
 fi
 
@@ -14,6 +15,7 @@ PATH=$PATH:$HOME/.local/bin:$HOME/bin
 export PATH
 
 if [ -f "$HOME/.profile" ]; then
+    # shellcheck disable=SC1091
     . "$HOME/.profile"
 fi
 
