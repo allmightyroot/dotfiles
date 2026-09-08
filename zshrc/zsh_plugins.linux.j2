@@ -2,7 +2,9 @@
 
 # Load oh-my-zsh lib first
 ohmyzsh/ohmyzsh path:lib
-ohmyzsh/ohmyzsh path:plugins/ubuntu
+{% for plugin in zsh_os_plugins %}
+ohmyzsh/ohmyzsh path:plugins/{{ plugin }}
+{% endfor %}
 
 ohmyzsh/ohmyzsh path:plugins/ansible
 ohmyzsh/ohmyzsh path:plugins/catimg

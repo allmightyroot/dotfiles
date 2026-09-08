@@ -1,0 +1,19 @@
+# ~/.zshrc for root
+# Deliberately minimal: no plugin manager. Root shells should stay
+# plain and vanilla - almost nothing interactive should happen as root.
+
+autoload -Uz compinit
+compinit
+
+autoload -Uz colors && colors
+
+# Make root prompts unmistakable
+PROMPT='%F{red}%n@%m%f %B%~%b # '
+
+HISTFILE=~/.zsh_history
+HISTSIZE=2000
+SAVEHIST=2000
+setopt HIST_IGNORE_DUPS SHARE_HISTORY
+
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
