@@ -20,10 +20,10 @@ ohmyzsh/ohmyzsh path:plugins/git
 ohmyzsh/ohmyzsh path:plugins/github
 ohmyzsh/ohmyzsh path:plugins/gitignore
 ohmyzsh/ohmyzsh path:plugins/history
+ohmyzsh/ohmyzsh path:plugins/kubectl
 ohmyzsh/ohmyzsh path:plugins/nmap
 ohmyzsh/ohmyzsh path:plugins/per-directory-history
 ohmyzsh/ohmyzsh path:plugins/pip
-ohmyzsh/ohmyzsh path:plugins/pyenv
 ohmyzsh/ohmyzsh path:plugins/rsync
 ohmyzsh/ohmyzsh path:plugins/ssh-agent
 ohmyzsh/ohmyzsh path:plugins/sudo

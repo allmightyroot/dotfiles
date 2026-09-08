@@ -19,21 +19,6 @@ source ~/.zsh_plugins.zsh
 # Alias to regenerate static plugin file
 alias antidote-update='source ${ZDOTDIR:-~}/.antidote/antidote.zsh && antidote bundle <${ZDOTDIR:-~}/.zsh_plugins.txt >${ZDOTDIR:-~}/.zsh_plugins.zsh && echo "Plugins regenerated! Restart your shell or run: source ~/.zshrc"'
 
-# Additional configurations
-if [[ -f /opt/homebrew/bin/virtualenvwrapper.sh ]]; then
-  export WORKON_HOME=$HOME/.virtualenvs
-  export PROJECT_HOME=$HOME/projects
-
-  # Lazy-load virtualenvwrapper - only loads when you actually use it
-  for cmd in workon mkvirtualenv rmvirtualenv deactivate lsvirtualenv; do
-    eval "$cmd() {
-      unset -f workon mkvirtualenv rmvirtualenv deactivate lsvirtualenv
-      source /opt/homebrew/bin/virtualenvwrapper.sh
-      \$cmd \"\$@\"
-    }"
-  done
-fi
-
 fastfetch
 
 [[ "$TERM_PROGRAM" == "vscode" ]] && . "$(code --locate-shell-integration-path zsh)"
