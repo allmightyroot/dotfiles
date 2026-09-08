@@ -21,10 +21,10 @@ ohmyzsh/ohmyzsh path:plugins/github
 ohmyzsh/ohmyzsh path:plugins/gitignore
 ohmyzsh/ohmyzsh path:plugins/grc
 ohmyzsh/ohmyzsh path:plugins/history
+ohmyzsh/ohmyzsh path:plugins/kubectl
 ohmyzsh/ohmyzsh path:plugins/nmap
 ohmyzsh/ohmyzsh path:plugins/per-directory-history
 ohmyzsh/ohmyzsh path:plugins/pip
-ohmyzsh/ohmyzsh path:plugins/pyenv
 ohmyzsh/ohmyzsh path:plugins/rsync
 ohmyzsh/ohmyzsh path:plugins/ssh-agent
 ohmyzsh/ohmyzsh path:plugins/sudo
@@ -46,7 +46,6 @@ unixorn/git-extra-commands
 
 # My stuff
 allmightyroot/zshdotfiles
-allmightyroot/zshdotfiles.mac
 
 # Theme (must be loaded after oh-my-zsh lib)
 ohmyzsh/ohmyzsh path:themes/afowler.zsh-theme
