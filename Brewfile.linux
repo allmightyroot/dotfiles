@@ -1,0 +1,35 @@
+# Shared Homebrew (Linuxbrew) baseline for Linux hosts.
+#
+# Consolidated 2026-09-17 from the union of `brew leaves` (explicitly
+# installed formulae, not transitive deps) on durnehviir and odahviing.
+# Apply with scripts/install_linux_homebrew.sh, which installs Homebrew
+# first if needed, then runs `brew bundle --file=Brewfile.linux`.
+#
+# `uv` added here as the pip/virtualenvwrapper replacement (see
+# sysprep-roles-packages, which no longer installs those as OS packages).
+# Python interpreter versions stay owned by `mise`; uv only handles
+# venvs/dependency installs on top of whatever mise puts on PATH.
+
+cask "1password-cli"
+
+brew "aoe"
+brew "argo"
+brew "atuin"
+brew "awscli"
+brew "cloudflare-speed-cli"
+brew "git-crypt"
+brew "glab"
+brew "helm"
+brew "k9s"
+brew "kubeseal"
+brew "lazygit"
+brew "lazyjournal"
+brew "lazyssh"
+brew "mise"
+brew "node"
+brew "opentofu"
+brew "pre-commit"
+brew "terragrunt"
+brew "usage"
+brew "uv"
+brew "yq"
