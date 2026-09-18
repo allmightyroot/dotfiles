@@ -1,0 +1,46 @@
+---
+# Automates what parked-ideas.md flagged as still hand-copied to a Mac:
+# zshrc/zshrc-antidote-mac and zshrc/zsh_plugins_mac.txt. Symlinks rather
+# than copies, so repo edits take effect immediately without a re-run.
+- name: Define managed Mac dotfile symlinks
+  ansible.builtin.set_fact:
+    mac_dotfiles_links:
+      - dest: "{{ ansible_facts.env.HOME }}/.zshrc"
+        src: "zshrc/zshrc-antidote-mac"
+      - dest: "{{ ansible_facts.env.HOME }}/.zsh_plugins.txt"
+        src: "zshrc/zsh_plugins_mac.txt"
+
+- name: Check current state of those paths
+  ansible.builtin.stat:
+    path: "{{ item.dest }}"
+  loop: "{{ mac_dotfiles_links }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  register: mac_dotfiles_stats
+
+# A fresh Mac won't have these files yet, but an existing one (like
+# paarthurnax) already has real, possibly-drifted copies in place - back
+# those up rather than silently overwriting, since this is the first time
+# this specific handoff is automated.
+- name: Back up any existing file that isn't already the managed symlink
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ item.item.dest }}"
+    dest: "{{ item.item.dest }}.pre-ansible-{{ ansible_facts.date_time.iso8601_basic_short }}"
+    mode: preserve
+  loop: "{{ mac_dotfiles_stats.results }}"
+  loop_control:
+    label: "{{ item.item.dest }}"
+  when:
+    - item.stat.exists
+    - not item.stat.islnk
+
+- name: Symlink Mac zsh dotfiles into place
+  ansible.builtin.file:
+    src: "{{ dotfiles_repo_root }}/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+    force: true
+  loop: "{{ mac_dotfiles_links }}"
+  loop_control:
+    label: "{{ item.dest }}"

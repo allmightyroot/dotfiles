@@ -1,0 +1,27 @@
+---
+# Mac sysprep playbook - run locally on a Mac after cloning this repo.
+#
+# Deliberately separate from the Linux-centric `sysprep` Ansible repo: a
+# fresh Mac has no reachable ansible_user/SSH bootstrap the way sysprep's
+# target hosts do, and most sysprep-roles-* are server-oriented and don't
+# apply to a laptop. This runs with connection: local instead - no SSH,
+# no automation user, just whoever is logged into the Mac.
+#
+# Usage:
+#   ansible-playbook ansible/mac-sysprep.yml
+#   ansible-playbook ansible/mac-sysprep.yml -e mac_work=true   # + SDG overlay
+#   ansible-playbook ansible/mac-sysprep.yml --check            # dry run
+#
+# Gotcha: ansible_distribution reports "MacOSX" here, not "Darwin";
+# ansible_facts.os_family is "Darwin".
+
+- name: Mac sysprep
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    dotfiles_repo_root: "{{ playbook_dir }}/.."
+    mac_work: false
+  roles:
+    - mac_homebrew
+    - mac_dotfiles
