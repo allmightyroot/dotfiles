@@ -1,0 +1,101 @@
+# Shared Homebrew baseline for macOS hosts (Apple Silicon).
+#
+# Consolidated 2026-09-18 from `brew leaves`/`brew list --cask -1` on
+# paarthurnax (personal) and sdgmacbookpro (SDG work laptop), pruned of
+# transitive dependencies and one-off "terminal trove" tools that don't
+# see real use. Apply with scripts/install_mac_homebrew.sh, which installs
+# Homebrew first if needed, then runs `brew bundle --file=Brewfile.mac`.
+#
+# SDG-work-only extras live in Brewfile.mac.work (applied on top of this
+# baseline via `install_mac_homebrew.sh --work`), not merged in here.
+#
+# Retired for consistency with the Linux side (see Brewfile.linux /
+# e3cf278 "Retire antigen, pyenv, and virtualenvwrapper"): antigen, pyenv,
+# virtualenv, virtualenvwrapper. `uv`/`mise` own that job now.
+#
+# `purple` (erickochen/purple tap) replaces lazyssh here - the SSH
+# workflow tool actually used on macOS.
+#
+# Dropped as unused "found it on terminal trove" cruft (re-add
+# individually if any of these turns out to still be wanted): antigen,
+# butane, cask (emacs's package manager - also dropped since emacs itself
+# was never intentionally installed), czkawka, elinks, fontforge, httrack,
+# jordanbaird-ice (replaced by thaw), llvm, neofetch (superseded by
+# fastfetch), osx-cpu-temp, pygments, pylint, pyenv, terraforming
+# (unmaintained - use `terraform import` blocks or terraformer instead),
+# tree-sitter@0.25, lsd (redundant with eza), virtualenv,
+# virtualenvwrapper.
+
+tap "hashicorp/tap"
+tap "jandedobbeleer/oh-my-posh"
+tap "erickochen/purple"
+
+cask "1password-cli"
+cask "openscad"
+cask "thaw"
+
+brew "ansible"
+brew "ansible-lint"
+brew "awscli"
+brew "bat"
+brew "bottom"
+brew "btop"
+brew "cloudflared"
+brew "duf"
+brew "eksctl"
+brew "erickochen/purple/purple"
+brew "eza"
+brew "fastfetch"
+brew "findutils"
+brew "fzf"
+brew "gawk"
+brew "gdu"
+brew "gh"
+brew "git"
+brew "git-crypt"
+brew "glances"
+brew "gnu-getopt"
+brew "gnu-indent"
+brew "gnu-sed"
+brew "gnu-tar"
+brew "gnupg"
+brew "go"
+brew "go@1.26"
+brew "graphviz"
+brew "grep"
+brew "hashicorp/tap/packer"
+brew "hashicorp/tap/terraform"
+brew "hashicorp/tap/vault"
+brew "helm"
+brew "htop"
+brew "hugo"
+brew "jandedobbeleer/oh-my-posh/oh-my-posh"
+brew "jq"
+brew "k9s"
+brew "kind"
+brew "lazygit"
+brew "lolcat"
+brew "minikube"
+brew "mole"
+brew "mongosh"
+brew "mosh"
+brew "most"
+brew "mysql-client"
+brew "ncdu"
+brew "nmap"
+brew "oci-cli"
+brew "openssh"
+brew "opentofu"
+brew "pipx"
+brew "powershell"
+brew "procs"
+brew "ripgrep"
+brew "rust"
+brew "snyk-cli"
+brew "speedtest-cli"
+brew "tailscale"
+brew "tmux"
+brew "uv"
+brew "wget"
+brew "yt-dlp"
+brew "zsh"

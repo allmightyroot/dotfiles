@@ -1,0 +1,30 @@
+# SDG work-laptop overlay, applied on top of Brewfile.mac.
+#
+# Consolidated 2026-09-18 from `brew leaves`/`brew list --cask -1` on
+# sdgmacbookpro - just the extras that are genuinely SDG-work-specific,
+# not the general baseline (see Brewfile.mac for that, plus the retired
+# and dropped-as-cruft package notes).
+#
+# Apply with: scripts/install_mac_homebrew.sh --work
+#
+# Kept only postgresql@18 (dropped @16 as redundant - add it back if a
+# specific project pins to it).
+#
+# Dropped as unrecognized one-off taps (re-add individually if actually
+# used): armgabrielyan/tap/deadbranch, kiki-ki/tap/qo,
+# matthart1983/tap/netwatch, matthart1983/tap/syswatch, skills.
+
+cask "claude-code"
+cask "dbeaver-community"
+cask "font-hack-nerd-font"
+cask "session-manager-plugin"
+
+brew "azure-cli"
+brew "docker-compose"
+brew "grc"
+brew "mise"
+brew "postgresql@18"
+brew "pre-commit"
+brew "shellcheck"
+brew "vercel"
+brew "yq"
