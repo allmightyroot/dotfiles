@@ -25,6 +25,15 @@
 # (unmaintained - use `terraform import` blocks or terraformer instead),
 # tree-sitter@0.25, lsd (redundant with eza), virtualenv,
 # virtualenvwrapper.
+#
+# Paarthurnax cleanup pass (2026-09-18), applied live rather than at
+# authoring time: autojump and Homebrew bash both dropped (bash: nothing
+# in this repo's scripts uses bash4+ syntax, so macOS's stock /bin/bash
+# 3.2 is fine - revisit only if a script actually needs bash4+ and
+# shebangs explicitly to /opt/homebrew/bin/bash). coreutils also dropped
+# (installed-on-request but unused, no BSD/GNU coreutils friction found
+# in practice). ffmpeg added below - installed-on-request and recent
+# enough to be active use, not cruft.
 
 tap "hashicorp/tap"
 tap "jandedobbeleer/oh-my-posh"
@@ -46,6 +55,7 @@ brew "eksctl"
 brew "erickochen/purple/purple"
 brew "eza"
 brew "fastfetch"
+brew "ffmpeg"
 brew "findutils"
 brew "fzf"
 brew "gawk"
