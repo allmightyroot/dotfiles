@@ -1,0 +1,20 @@
+---
+- name: Refuse to run on non-Mac hosts
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == "Darwin"
+    fail_msg: >-
+      This role only applies to macOS hosts. ansible_facts.os_family is
+      "{{ ansible_facts.os_family }}" - note ansible_distribution reports
+      "MacOSX" here, not "Darwin"; os_family is the reliable check.
+  tags: always
+
+- name: Apply Brewfile.mac (and Brewfile.mac.work overlay if mac_work is set)
+  ansible.builtin.command:
+    cmd: >-
+      {{ dotfiles_repo_root }}/scripts/install_mac_homebrew.sh{{ ' --work' if mac_work | default(false) else '' }}
+  changed_when: true
+  # install_mac_homebrew.sh / `brew bundle` are both idempotent on their
+  # own (brew bundle only installs what's missing), so this always
+  # reports "changed" rather than tracking real diffs - correct
+  # convergence matters more here than clean Ansible changed/ok output.
