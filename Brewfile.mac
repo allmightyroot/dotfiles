@@ -34,13 +34,21 @@
 # (installed-on-request but unused, no BSD/GNU coreutils friction found
 # in practice). ffmpeg added below - installed-on-request and recent
 # enough to be active use, not cruft.
+#
+# Same pass: `brew doctor` flagged two deprecated packages, both swapped
+# for maintained replacements rather than just dropped. `openscad`
+# (2021.01, Intel-only, cask disabled 2026-09-01 for failing Gatekeeper)
+# -> `openscad@snapshot` (actively updated, native Apple Silicon).
+# `speedtest-cli` (unmaintained upstream, Ookla-based) ->
+# `cloudflare-speed-cli` (Cloudflare-based CLI Chris had already switched
+# to in practice; in homebrew-core directly, no tap needed).
 
 tap "hashicorp/tap"
 tap "jandedobbeleer/oh-my-posh"
 tap "erickochen/purple"
 
 cask "1password-cli"
-cask "openscad"
+cask "openscad@snapshot"
 cask "thaw"
 
 brew "ansible"
@@ -49,6 +57,7 @@ brew "awscli"
 brew "bat"
 brew "bottom"
 brew "btop"
+brew "cloudflare-speed-cli"
 brew "cloudflared"
 brew "duf"
 brew "eksctl"
@@ -102,7 +111,6 @@ brew "procs"
 brew "ripgrep"
 brew "rust"
 brew "snyk-cli"
-brew "speedtest-cli"
 brew "tailscale"
 brew "tmux"
 brew "uv"
