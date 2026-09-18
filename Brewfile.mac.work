@@ -10,6 +10,10 @@
 # Kept only postgresql@18 (dropped @16 as redundant - add it back if a
 # specific project pins to it).
 #
+# grc moved to the Brewfile.mac baseline (2026-09-18): zsh_plugins_mac.txt
+# includes the ohmyzsh grc plugin unconditionally for every Mac, so the
+# binary it wraps needs to be in the baseline too, not just here.
+#
 # Dropped as unrecognized one-off taps (re-add individually if actually
 # used): armgabrielyan/tap/deadbranch, kiki-ki/tap/qo,
 # matthart1983/tap/netwatch, matthart1983/tap/syswatch, skills.
@@ -21,7 +25,6 @@ cask "session-manager-plugin"
 
 brew "azure-cli"
 brew "docker-compose"
-brew "grc"
 brew "mise"
 brew "postgresql@18"
 brew "pre-commit"

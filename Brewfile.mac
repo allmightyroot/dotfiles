@@ -35,6 +35,12 @@
 # in practice). ffmpeg added below - installed-on-request and recent
 # enough to be active use, not cruft.
 #
+# Same pass: `grc` moved here from Brewfile.mac.work - zsh_plugins_mac.txt
+# includes the ohmyzsh grc plugin (colorizes ps/df/etc.) unconditionally
+# for every Mac, so the binary it wraps belongs in the shared baseline,
+# not the work-only overlay. Caught because it silently no-ops instead of
+# erroring when the binary is missing - ps/df just stay uncolored.
+#
 # Same pass: `brew doctor` flagged two deprecated packages, both swapped
 # for maintained replacements rather than just dropped. `openscad`
 # (2021.01, Intel-only, cask disabled 2026-09-01 for failing Gatekeeper)
@@ -81,6 +87,7 @@ brew "gnupg"
 brew "go"
 brew "go@1.26"
 brew "graphviz"
+brew "grc"
 brew "grep"
 brew "hashicorp/tap/packer"
 brew "hashicorp/tap/terraform"
