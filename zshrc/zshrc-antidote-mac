@@ -6,6 +6,16 @@
 eval "$(/opt/homebrew/bin/brew shellenv)"
 export PATH="$HOME/.local/bin:$PATH"
 
+# oh-my-zsh's lib/plugins assume ZSH_CACHE_DIR is set up (normally done by
+# oh-my-zsh.sh itself, which this antidote-based setup never sources). Without
+# it, e.g. the kubectl plugin's background completion refresh resolves
+# TMPPREFIX to the bogus path "/completions/_kubectl", and zsh's process
+# substitution crashes (double-free in prefork/getoutputfile) trying to
+# create a temp file there - the "process substitution failed" + malloc
+# crash seen on shell startup. Set it up the same way oh-my-zsh.sh does.
+export ZSH_CACHE_DIR="${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}"
+[[ -d "$ZSH_CACHE_DIR/completions" ]] || mkdir -p "$ZSH_CACHE_DIR/completions"
+
 # Clone antidote if necessary.
 [[ -e ${ZDOTDIR:-~}/.antidote ]] ||
   git clone https://github.com/mattmc3/antidote.git ${ZDOTDIR:-~}/.antidote
