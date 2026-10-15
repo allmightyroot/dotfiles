@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# Sync ~/.repos/mygit between Chris's machines (one-way per run, no --delete by default).
+# Direction defaults per host: servers push to their peer; the laptop pulls from durnehviir.
+# Usage: sync-repos [-n|--dry-run] [--pull|--push] [--delete] [--memory] [peer-host]
+#   --pull    peer -> this host        --push   this host -> peer
+#   --memory  also sync memory/ of every ~/.claude/projects/* (project dir names are
+#             translated when the two hosts have different home paths, e.g. /home vs /Users)
+# Needs rsync >= 3 (macOS: brew install rsync); works with bash 3.2.
+set -euo pipefail
+
+SELF="$(hostname -s)"
+PEER=""
+PULL=""
+DRY=()
+DELETE=()
+MEMORY=0
+
+# Per-host defaults.
+case "$SELF" in
+  durnehviir)  PEER=odahviing ;;
+  odahviing)   PEER=durnehviir ;;
+  paarthurnax) PEER=durnehviir; PULL=1 ;;
+esac
+
+for arg in "$@"; do
+  case "$arg" in
+    -n|--dry-run) DRY=(--dry-run) ;;
+    --delete)     DELETE=(--delete) ;;
+    --memory)     MEMORY=1 ;;
+    --pull)       PULL=1 ;;
+    --push)       PULL=0 ;;
+    -h|--help)    sed -n '2,9p' "$0"; exit 0 ;;
+    -*)           echo "Unknown option: $arg" >&2; exit 2 ;;
+    *)            PEER="$arg" ;;
+  esac
+done
+PULL="${PULL:-0}"
+
+if [[ -z "$PEER" || "$PEER" == "$SELF" ]]; then
+  echo "Refusing to sync $SELF to itself; pass a different peer host." >&2
+  exit 1
+fi
+
+# Prefer Homebrew rsync (macOS ships an old/limited one).
+RSYNC="$(command -v /opt/homebrew/bin/rsync || command -v /usr/local/bin/rsync || command -v rsync)"
+if [[ "$("$RSYNC" --version | head -1 | sed -E 's/.*version +([0-9]+).*/\1/')" -lt 3 ]]; then
+  echo "rsync >= 3 required (found: $("$RSYNC" --version | head -1)). On macOS: brew install rsync" >&2
+  exit 1
+fi
+
+EXCLUDES=(
+  --exclude node_modules/ --exclude .venv/ --exclude .terraform/
+  --exclude __pycache__/ --exclude .mypy_cache/ --exclude .ruff_cache/
+  --exclude .pytest_cache/
+)
+
+# Expand possibly-empty arrays safely under `set -u` on bash 3.2.
+# Usage: "${DRY[@]+"${DRY[@]}"}"
+
+# Refuse to copy from a side with repos mid-operation (torn .git state).
+LOCKCMD="find ~/.repos/mygit -maxdepth 3 -path '*/.git/*.lock' -name '*.lock' 2>/dev/null || true"
+if [[ $PULL -eq 1 ]]; then
+  # shellcheck disable=SC2029  # expanding LOCKCMD client-side is intended
+  locked=$(ssh "$PEER" "$LOCKCMD")
+else
+  locked=$(bash -c "$LOCKCMD")
+fi
+if [[ -n "$locked" ]]; then
+  echo "Refusing to sync: git lock files present on source:" >&2
+  echo "$locked" >&2
+  exit 1
+fi
+
+# $1 = local path (trailing slash), $2 = path on the peer relative to its $HOME, rest = rsync args
+run_rsync() {
+  local local_path="$1" remote_rel="$2"; shift 2
+  local src="$local_path" dst="$PEER:$remote_rel"
+  if [[ $PULL -eq 1 ]]; then src="$PEER:$remote_rel"; dst="$local_path"; fi
+  echo ">> $src -> $dst ${DRY[*]+"${DRY[*]}"}"
+  "$RSYNC" -aHu --info=stats2 ${DRY[@]+"${DRY[@]}"} "$@" "$src" "$dst"
+}
+
+run_rsync "$HOME/.repos/mygit/" ".repos/mygit/" ${DELETE[@]+"${DELETE[@]}"} "${EXCLUDES[@]}"
+
+if [[ $MEMORY -eq 1 ]]; then
+  # Claude names a project dir after its path with / and . turned into -.
+  enc() { printf '%s' "$1" | sed 's/[\/.]/-/g'; }
+  SELF_ENC="$(enc "$HOME")"
+  PEER_HOME="$(ssh "$PEER" 'printf %s "$HOME"')"
+  PEER_ENC="$(enc "$PEER_HOME")"
+
+  # Name of project dir $1 (as it exists on the source side) as it should be named on the dest side.
+  translate() {
+    local name="$1" from="$PEER_ENC" to="$SELF_ENC"
+    [[ $PULL -eq 1 ]] || { from="$SELF_ENC"; to="$PEER_ENC"; }
+    if [[ "$name" == "$from"* ]]; then printf '%s' "$to${name#"$from"}"; else printf '%s' "$name"; fi
+  }
+
+  if [[ $PULL -eq 1 ]]; then
+    projects="$(ssh "$PEER" 'for d in ~/.claude/projects/*/memory; do [ -d "$d" ] && basename "$(dirname "$d")"; done' || true)"
+  else
+    projects="$(for d in "$HOME"/.claude/projects/*/memory; do [ -d "$d" ] && basename "$(dirname "$d")"; done || true)"
+  fi
+
+  while IFS= read -r p; do
+    [[ -z "$p" ]] && continue
+    dest="$(translate "$p")"
+    if [[ $PULL -eq 1 ]]; then
+      mkdir -p "$HOME/.claude/projects/$dest/memory"
+      src_p="$p"; dst_p="$dest"
+    else
+      # shellcheck disable=SC2029  # expanding dest client-side is intended
+      ssh -n "$PEER" "mkdir -p ~/.claude/projects/'$dest'/memory"
+      src_p="$p"; dst_p="$dest"
+    fi
+    if [[ $PULL -eq 1 ]]; then
+      echo ">> $PEER:.claude/projects/$src_p/memory/ -> ~/.claude/projects/$dst_p/memory/ ${DRY[*]+"${DRY[*]}"}"
+      "$RSYNC" -aHu --info=stats0 ${DRY[@]+"${DRY[@]}"} "$PEER:.claude/projects/$src_p/memory/" "$HOME/.claude/projects/$dst_p/memory/"
+    else
+      echo ">> ~/.claude/projects/$src_p/memory/ -> $PEER:.claude/projects/$dst_p/memory/ ${DRY[*]+"${DRY[*]}"}"
+      "$RSYNC" -aHu --info=stats0 ${DRY[@]+"${DRY[@]}"} "$HOME/.claude/projects/$src_p/memory/" "$PEER:.claude/projects/$dst_p/memory/"
+    fi
+  done <<< "$projects"
+fi
+
+echo "Done. Run 'git fetch' in the repos on the destination to pick up anything pushed since."
