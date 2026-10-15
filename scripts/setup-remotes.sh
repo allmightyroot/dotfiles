@@ -29,7 +29,7 @@ echo "Primary (fetch): $fetch_url"
 # any pushurl overrides git's default push-to-fetch-url behavior.
 git remote set-url --add --push "$remote" "$fetch_url"
 git remote set-url --add --push "$remote" "git@github.com:${github_org}/${repo_name}.git"
-git remote set-url --add --push "$remote" "git@bitbucket.org:${bitbucket_org}/${repo_name}.git"
+git remote set-url --add --push "$remote" "git@ssh.bitbucket.org:${bitbucket_org}/${repo_name}.git"
 
 if [ -n "${FORGEJO_URL:-}" ]; then
   git remote set-url --add --push "$remote" "$FORGEJO_URL"
