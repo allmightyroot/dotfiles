@@ -113,9 +113,9 @@ if [[ $MEMORY -eq 1 ]]; then
   }
 
   if [[ $PULL -eq 1 ]]; then
-    projects="$(ssh "$PEER" 'for d in ~/.claude/projects/*/memory; do [ -d "$d" ] && basename "$(dirname "$d")"; done' || true)"
+    projects="$(ssh "$PEER" 'for d in ~/.claude/projects/*/memory; do [ -d "$d" ] && [ ! -L "$d" ] && basename "$(dirname "$d")"; done' || true)"
   else
-    projects="$(for d in "$HOME"/.claude/projects/*/memory; do [ -d "$d" ] && basename "$(dirname "$d")"; done || true)"
+    projects="$(for d in "$HOME"/.claude/projects/*/memory; do [ -d "$d" ] && [ ! -L "$d" ] && basename "$(dirname "$d")"; done || true)"
   fi
 
   # --mkpath creates the destination path only on a real run, so -n touches nothing.
@@ -123,6 +123,10 @@ if [[ $MEMORY -eq 1 ]]; then
   while IFS= read -r p; do
     [[ -z "$p" ]] && continue
     dest="$(translate "$p")"
+    # A symlinked memory/ is managed through the claudebrain vault; never write through it.
+    if [[ $PULL -eq 1 ]]; then dest_link=$([[ -L "$HOME/.claude/projects/$dest/memory" ]] && echo 1 || echo 0)
+    else dest_link=$(ssh -n "$PEER" "[ -L ~/.claude/projects/'$dest'/memory ] && echo 1 || echo 0"); fi
+    if [[ "$dest_link" == 1 ]]; then echo ">> skip $dest (memory/ is a symlink on the destination)"; continue; fi
     if [[ $PULL -eq 1 ]]; then
       echo ">> $PEER:.claude/projects/$p/memory/ -> ~/.claude/projects/$dest/memory/ ${DRY[*]+"${DRY[*]}"}"
       "$RSYNC" -aHu --mkpath --info=stats0 ${ITEM[@]+"${ITEM[@]}"} ${DRY[@]+"${DRY[@]}"} "$PEER:.claude/projects/$p/memory/" "$HOME/.claude/projects/$dest/memory/"
@@ -131,6 +135,7 @@ if [[ $MEMORY -eq 1 ]]; then
       "$RSYNC" -aHu --mkpath --info=stats0 ${ITEM[@]+"${ITEM[@]}"} ${DRY[@]+"${DRY[@]}"} "$HOME/.claude/projects/$p/memory/" "$PEER:.claude/projects/$dest/memory/"
     fi
   done <<< "$projects"
+  echo ">> note: symlinked memory/ dirs are skipped; they sync through the claudebrain vault (Syncthing)"
 fi
 
 echo "Done. Run 'git fetch' in the repos on the destination to pick up anything pushed since."
