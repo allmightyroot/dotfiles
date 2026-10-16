@@ -1,0 +1,6 @@
+---
+# Root of the claudebrain vault on this host. Override per host (host_vars) if it differs.
+claude_memory_links_vault_root: >-
+  {{ (ansible_facts.env.HOME ~ '/syncthing/homelab/claudebrain')
+     if ansible_facts.os_family == 'Darwin'
+     else '/data/syncthing/claudebrain' }}
