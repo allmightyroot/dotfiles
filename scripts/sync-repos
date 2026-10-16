@@ -6,7 +6,7 @@
 #   --no-secrets  skip ~/.secrets (synced by default; dir kept 0700)
 #   --memory  also sync memory/ of every ~/.claude/projects/* (project dir names are
 #             translated when the two hosts have different home paths, e.g. /home vs /Users)
-# Needs rsync >= 3 (macOS: brew install rsync); works with bash 3.2.
+# Needs rsync >= 3.2.3 (macOS: brew install rsync); works with bash 3.2.
 set -euo pipefail
 
 SELF="$(hostname -s)"
@@ -118,23 +118,17 @@ if [[ $MEMORY -eq 1 ]]; then
     projects="$(for d in "$HOME"/.claude/projects/*/memory; do [ -d "$d" ] && basename "$(dirname "$d")"; done || true)"
   fi
 
+  # --mkpath creates the destination path only on a real run, so -n touches nothing.
+  ITEM=(); [[ ${#DRY[@]} -gt 0 ]] && ITEM=(-i)
   while IFS= read -r p; do
     [[ -z "$p" ]] && continue
     dest="$(translate "$p")"
     if [[ $PULL -eq 1 ]]; then
-      mkdir -p "$HOME/.claude/projects/$dest/memory"
-      src_p="$p"; dst_p="$dest"
+      echo ">> $PEER:.claude/projects/$p/memory/ -> ~/.claude/projects/$dest/memory/ ${DRY[*]+"${DRY[*]}"}"
+      "$RSYNC" -aHu --mkpath --info=stats0 ${ITEM[@]+"${ITEM[@]}"} ${DRY[@]+"${DRY[@]}"} "$PEER:.claude/projects/$p/memory/" "$HOME/.claude/projects/$dest/memory/"
     else
-      # shellcheck disable=SC2029  # expanding dest client-side is intended
-      ssh -n "$PEER" "mkdir -p ~/.claude/projects/'$dest'/memory"
-      src_p="$p"; dst_p="$dest"
-    fi
-    if [[ $PULL -eq 1 ]]; then
-      echo ">> $PEER:.claude/projects/$src_p/memory/ -> ~/.claude/projects/$dst_p/memory/ ${DRY[*]+"${DRY[*]}"}"
-      "$RSYNC" -aHu --info=stats0 ${DRY[@]+"${DRY[@]}"} "$PEER:.claude/projects/$src_p/memory/" "$HOME/.claude/projects/$dst_p/memory/"
-    else
-      echo ">> ~/.claude/projects/$src_p/memory/ -> $PEER:.claude/projects/$dst_p/memory/ ${DRY[*]+"${DRY[*]}"}"
-      "$RSYNC" -aHu --info=stats0 ${DRY[@]+"${DRY[@]}"} "$HOME/.claude/projects/$src_p/memory/" "$PEER:.claude/projects/$dst_p/memory/"
+      echo ">> ~/.claude/projects/$p/memory/ -> $PEER:.claude/projects/$dest/memory/ ${DRY[*]+"${DRY[*]}"}"
+      "$RSYNC" -aHu --mkpath --info=stats0 ${ITEM[@]+"${ITEM[@]}"} ${DRY[@]+"${DRY[@]}"} "$HOME/.claude/projects/$p/memory/" "$PEER:.claude/projects/$dest/memory/"
     fi
   done <<< "$projects"
 fi
