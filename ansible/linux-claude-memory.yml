@@ -1,0 +1,10 @@
+---
+# Re-link per-project Claude memory into the claudebrain vault (Linux hosts).
+# Run locally after a rebuild, once Syncthing has the vault:
+#   ansible-playbook ansible/linux-claude-memory.yml [--check]
+- name: Claude memory links
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  roles:
+    - claude_memory_links

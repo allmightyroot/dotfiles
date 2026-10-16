@@ -1,0 +1,88 @@
+---
+# Re-create the per-project Claude memory symlinks after a rebuild:
+#   ~/.claude/projects/<encoded-path>/memory -> <vault>/claude-projects/<key>/memory
+# <key> is the encoded project path minus the encoded $HOME and the leading "--"
+# ("_home" for the home dir itself), so the encoded name is rebuilt from the key
+# without needing the original repo path. New projects are handled at session
+# start by claude-config's check-claude-memory-link.sh hook.
+- name: Check that the claudebrain vault is present on this host
+  ansible.builtin.stat:
+    path: "{{ claude_memory_links_vault_root }}/claude-projects"
+  register: claude_memory_links_vault
+
+- name: Say so when there is no vault to link
+  ansible.builtin.debug:
+    msg: >-
+      {{ claude_memory_links_vault_root }}/claude-projects not found; skipping Claude memory links
+      (no vault on this host, or Syncthing has not synced yet).
+  when: not claude_memory_links_vault.stat.exists
+
+- name: Link per-project Claude memory into the vault
+  when: claude_memory_links_vault.stat.exists
+  block:
+    - name: Find vault project keys
+      ansible.builtin.find:
+        paths: "{{ claude_memory_links_vault_root }}/claude-projects"
+        file_type: directory
+      register: claude_memory_links_keys
+
+    - name: Work out source and destination for each key
+      ansible.builtin.set_fact:
+        claude_memory_links_pairs: >-
+          {{ claude_memory_links_pairs | default([]) + [{
+               'key': key,
+               'src': item.path ~ '/memory',
+               'dest': ansible_facts.env.HOME ~ '/.claude/projects/'
+                       ~ (home_enc if key == '_home' else home_enc ~ '--' ~ key) ~ '/memory'
+             }] }}
+      vars:
+        key: "{{ item.path | basename }}"
+        home_enc: "{{ ansible_facts.env.HOME | regex_replace('[/.]', '-') }}"
+      loop: "{{ claude_memory_links_keys.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+
+    - name: Ensure the vault memory dir exists for every key
+      ansible.builtin.file:
+        path: "{{ item.src }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ claude_memory_links_pairs | default([]) }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Check current state of each project memory path
+      ansible.builtin.stat:
+        path: "{{ item.dest }}"
+      loop: "{{ claude_memory_links_pairs | default([]) }}"
+      loop_control:
+        label: "{{ item.key }}"
+      register: claude_memory_links_stats
+
+    - name: Create project dirs for the links
+      ansible.builtin.file:
+        path: "{{ item.item.dest | dirname }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ claude_memory_links_stats.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
+      when: not item.stat.exists
+
+    - name: Link project memory into the vault
+      ansible.builtin.file:
+        src: "{{ item.item.src }}"
+        dest: "{{ item.item.dest }}"
+        state: link
+      loop: "{{ claude_memory_links_stats.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
+      when: not item.stat.exists or item.stat.islnk
+
+    - name: Warn about real memory dirs left alone (merge by hand)
+      ansible.builtin.debug:
+        msg: "{{ item.item.dest }} is a real directory; not replaced. Merge into the vault by hand."
+      loop: "{{ claude_memory_links_stats.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
+      when: item.stat.exists and not item.stat.islnk

@@ -25,3 +25,4 @@
   roles:
     - mac_homebrew
     - mac_dotfiles
+    - claude_memory_links   # skips itself if the claudebrain vault isn't on this Mac
