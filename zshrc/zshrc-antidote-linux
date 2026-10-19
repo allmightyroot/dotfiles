@@ -59,3 +59,11 @@ fi
 
 # Optional: Run fastfetch only in interactive shells
 [[ -o interactive ]] && command -v fastfetch &>/dev/null && fastfetch
+
+# Claude Code (CLAUDECODE=1) runs commands through this shell with nobody to
+# answer prompts: common-aliases' cp -i / mv -i / rm -I hang until timeout or
+# silently skip the overwrite, and its global aliases (G, H, L, T, ...) expand
+# anywhere on a line. Give it plain commands; interactive shells keep them all.
+if [[ -n $CLAUDECODE ]]; then
+  unalias -m '*'
+fi
