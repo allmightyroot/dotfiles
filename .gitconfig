@@ -10,5 +10,3 @@
 	up = pull --rebase --autostash
 [init]
 	defaultBranch = main
-[safe]
-	directory = /data/nas-linux/mygit/sysprep-role
