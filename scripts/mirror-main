@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Push the default branch (and tags) to every push URL of origin.
+#
+# Companion to setup-remotes.sh. Feature branches should go to the primary
+# only, so the mirrors don't collect branches that get merged and deleted on
+# the primary where the mirrors never hear about it:
+#
+#   git push -u "$(git remote get-url origin)" my-feature   # primary only
+#   mirror-main                                             # after merging
+#
+# Also catches mirrors that fell behind because a merge happened in the
+# GitLab UI. Pushes are never forced; a diverged mirror is reported and left
+# alone. Run mirror-prune-branches to clear leftover merged branches.
+#
+# Usage (inside a repo):
+#   mirror-main            fetch origin, then push <default> + tags to each URL
+#   mirror-main -n         dry run
+#   mirror-main <branch>   push a different branch instead of the default
+
+set -euo pipefail
+
+remote=origin
+dry=()
+if [ "${1:-}" = "-n" ]; then
+  dry=(--dry-run)
+  shift
+fi
+
+git fetch --quiet "$remote"
+
+branch="${1:-}"
+if [ -z "$branch" ]; then
+  branch=$(git symbolic-ref --short "refs/remotes/$remote/HEAD" 2>/dev/null | sed "s|^$remote/||" || true)
+  branch="${branch:-main}"
+fi
+
+# Push the primary's copy, not whatever is checked out locally.
+ref="refs/remotes/$remote/$branch"
+git rev-parse --verify --quiet "$ref" >/dev/null || {
+  echo "No $ref; is '$branch' the right branch?" >&2
+  exit 1
+}
+
+status=0
+while IFS= read -r url; do
+  echo "== $url"
+  if ! git push "${dry[@]}" "$url" "$ref:refs/heads/$branch" --tags; then
+    echo "   FAILED (diverged or unreachable; not forced)" >&2
+    status=1
+  fi
+done < <(git remote get-url --push --all "$remote")
+
+exit "$status"
