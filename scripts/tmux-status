@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Segments for the tmux status line (see .tmux.conf). Prints tmux style codes.
+# Linux only: reads /proc. Colors are the Catppuccin Mocha palette.
+#
+# Usage:
+#   tmux-status stats          load, memory used and uptime
+#   tmux-status where <path>   directory (and git branch) of a pane
+
+set -euo pipefail
+
+text='#[fg=#cdd6f4]'
+peach='#[fg=#fab387]'
+red='#[fg=#f38ba8]'
+dim='#[fg=#6c7086]'
+
+stats() {
+  local load cores mem_total mem_avail up
+  read -r load _ < /proc/loadavg
+  cores=$(nproc)
+  read -r mem_total mem_avail < <(awk '/^MemTotal:/ {t=$2} /^MemAvailable:/ {a=$2} END {print t, a}' /proc/meminfo)
+  read -r up _ < /proc/uptime
+
+  awk -v ld="$load" -v cores="$cores" -v total="$mem_total" -v avail="$mem_avail" -v up="$up" \
+    -v text="$text" -v peach="$peach" -v red="$red" -v dim="$dim" 'BEGIN {
+      ratio = ld / cores
+      lc = ratio >= 1 ? red : (ratio >= 0.7 ? peach : text)
+      used = total - avail
+      pct = used * 100 / total
+      mc = pct >= 90 ? red : (pct >= 80 ? peach : text)
+      s = int(up); d = int(s / 86400); h = int((s % 86400) / 3600); m = int((s % 3600) / 60)
+      u = d > 0 ? d "d" h "h" : (h > 0 ? h "h" m "m" : m "m")
+      printf "%sload %s%s  %smem %s%.1f/%.0fG%s  %sup %s%s",
+        dim, lc, ld, dim, mc, used / 1048576, total / 1048576, text, dim, text, u
+    }'
+}
+
+where() {
+  local dir=${1:-$PWD} branch short
+  short=${dir/#"$HOME"/\~}
+  # Keep the last two path components
+  short=$(awk -F/ '{ if (NF > 3) print "…/" $(NF-1) "/" $NF; else print $0 }' <<<"$short")
+  short=${short//#/##}
+  branch=$(git -C "$dir" symbolic-ref --short -q HEAD 2>/dev/null || git -C "$dir" rev-parse --short HEAD 2>/dev/null || true)
+  if [ -n "$branch" ]; then
+    printf '%s %s  %s %s' "$text" "$short" $'' "${branch//#/##}"
+  else
+    printf '%s %s' "$text" "$short"
+  fi
+}
+
+case "${1:-}" in
+  stats) stats ;;
+  where) where "${2:-}" ;;
+  *) echo "usage: tmux-status stats | where <path>" >&2; exit 2 ;;
+esac
