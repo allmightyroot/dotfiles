@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Symlink the helper scripts in this directory into ~/.local/bin so they run
+# by name (mirror-main, sync-repos, ...). Safe to rerun after adding a script.
+#
+# Links every executable here except install_* (one-off machine setup) and
+# this script. Existing correct links are left alone, links pointing
+# elsewhere are repointed, and a real file with the same name is reported and
+# never overwritten.
+#
+# Usage:
+#   scripts/link-scripts       link them
+#   scripts/link-scripts -n    show what would change
+
+set -euo pipefail
+
+dry=0
+[ "${1:-}" = "-n" ] && dry=1
+
+src_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+bin_dir="${LINK_DIR:-$HOME/.local/bin}"
+self=$(basename "${BASH_SOURCE[0]}")
+
+[ "$dry" -eq 1 ] || mkdir -p "$bin_dir"
+
+for f in "$src_dir"/*; do
+  name=$(basename "$f")
+  [ -f "$f" ] && [ -x "$f" ] || continue
+  case "$name" in install_*|"$self") continue ;; esac
+
+  dest="$bin_dir/$name"
+  if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$f" ]; then
+    echo "ok       $name"
+  elif [ -e "$dest" ] && [ ! -L "$dest" ]; then
+    echo "SKIPPED  $name ($dest is a real file; move it aside to link)" >&2
+  elif [ "$dry" -eq 1 ]; then
+    echo "would link $name"
+  else
+    ln -sfn "$f" "$dest"
+    echo "linked   $name"
+  fi
+done
+
+case ":$PATH:" in
+  *":$bin_dir:"*) ;;
+  *) echo "Note: $bin_dir is not on PATH in this shell." >&2 ;;
+esac
