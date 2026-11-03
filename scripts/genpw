@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Generate a random machine secret (vault, sealed-secret and token values).
+
+Uses the stdlib `secrets` module (OS CSPRNG), so there are no dependencies.
+Default is alphanumeric, which is safe to paste into YAML, shell, URLs and
+`kubeseal --raw` without quoting. The first character is always a letter or
+digit so a value never starts with a YAML-special character.
+
+Usage:
+  genpw                   32 alphanumeric characters
+  genpw 24                24 alphanumeric characters
+  genpw --symbols 20      alphanumeric plus a small shell/YAML-safe symbol set
+  genpw --hex 64          64 hex characters
+  genpw --urlsafe 40      letters, digits, - and _
+  genpw --copy            copy to the clipboard instead of printing
+
+Output has no trailing newline unless stdout is a terminal, so these work:
+  genpw | kubeseal --controller-namespace kube-system --controller-name sealed-secrets --raw --namespace NS --name NAME
+  genpw | ansible-vault encrypt_string --stdin-name nut_secondary_password
+  TOKEN=$(genpw 48)
+
+Passwords you type yourself (website logins) belong in 1Password's own
+generator. Record anything you will need outside the repo in 1Password.
+"""
+
+import argparse
+import secrets
+import shutil
+import string
+import subprocess
+import sys
+
+LOWER = string.ascii_lowercase
+UPPER = string.ascii_uppercase
+DIGITS = string.digits
+# No quotes, backslash, $, backtick, space, braces or brackets: nothing that
+# needs quoting in sh, YAML flow context or a URL userinfo part.
+SYMBOLS = "!#%+,-.:=@^_~"
+
+MIN_LEN = 8
+MAX_LEN = 1024
+
+
+def build(length, mode):
+    if mode == "hex":
+        return secrets.token_hex((length + 1) // 2)[:length]
+    if mode == "urlsafe":
+        alphabet = LOWER + UPPER + DIGITS + "-_"
+        classes = [LOWER, UPPER, DIGITS]
+    elif mode == "symbols":
+        alphabet = LOWER + UPPER + DIGITS + SYMBOLS
+        classes = [LOWER, UPPER, DIGITS, SYMBOLS]
+    else:
+        alphabet = LOWER + UPPER + DIGITS
+        classes = [LOWER, UPPER, DIGITS]
+
+    first_chars = LOWER + UPPER + DIGITS
+    while True:
+        pw = secrets.choice(first_chars) + "".join(
+            secrets.choice(alphabet) for _ in range(length - 1)
+        )
+        # Many sites and tools want one of each class; retry until it has them.
+        if all(any(c in cls for c in pw) for cls in classes):
+            return pw
+
+
+def copy_to_clipboard(text):
+    for cmd in (["pbcopy"], ["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "-ib"]):
+        if shutil.which(cmd[0]):
+            subprocess.run(cmd, input=text.encode(), check=True)
+            return cmd[0]
+    return None
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate a random machine secret (default: alphanumeric).",
+        epilog="No trailing newline when piped, so it can feed kubeseal and ansible-vault directly.",
+    )
+    parser.add_argument("length", nargs="?", type=int, default=32,
+                        help=f"characters, {MIN_LEN}-{MAX_LEN} (default 32)")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--alnum", action="store_const", const="alnum", dest="mode",
+                       help="letters and digits (default)")
+    group.add_argument("--symbols", action="store_const", const="symbols", dest="mode",
+                       help=f"letters, digits and {SYMBOLS}")
+    group.add_argument("--hex", action="store_const", const="hex", dest="mode",
+                       help="hex digits")
+    group.add_argument("--urlsafe", action="store_const", const="urlsafe", dest="mode",
+                       help="letters, digits, - and _")
+    parser.add_argument("--copy", action="store_true",
+                        help="copy to the clipboard and print nothing")
+    args = parser.parse_args()
+
+    if not MIN_LEN <= args.length <= MAX_LEN:
+        parser.error(f"length must be between {MIN_LEN} and {MAX_LEN}")
+
+    pw = build(args.length, args.mode or "alnum")
+
+    if args.copy:
+        tool = copy_to_clipboard(pw)
+        if tool is None:
+            sys.exit("genpw: no clipboard tool found (pbcopy, wl-copy, xclip, xsel)")
+        print(f"genpw: copied {len(pw)} characters via {tool}", file=sys.stderr)
+        return
+
+    sys.stdout.write(pw)
+    if sys.stdout.isatty():
+        sys.stdout.write("\n")
+
+
+if __name__ == "__main__":
+    main()
