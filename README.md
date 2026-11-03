@@ -4,7 +4,7 @@ Shell config, Brewfiles, ssh config and helper scripts.
 
 ## Helper scripts
 
-`scripts/` holds small tools (`sync-repos`, `mirror-main`, `mirror-prune-branches`, `setup-remotes.sh`). After cloning, or after adding a script, run:
+`scripts/` holds small tools (`genpw`, `sync-repos`, `mirror-main`, `mirror-prune-branches`, `setup-remotes.sh`). After cloning, or after adding a script, run:
 
 ```
 scripts/link-scripts       # symlinks the executables into ~/.local/bin
