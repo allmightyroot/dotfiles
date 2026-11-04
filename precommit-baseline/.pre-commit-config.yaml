@@ -1,0 +1,30 @@
+---
+# Master copy of the pre-commit baseline shared by every repo under ~/.repos/mygit.
+#
+# Do not run pre-commit from this directory. The file is named
+# .pre-commit-config.yaml on purpose so Renovate's pre-commit manager finds and
+# bumps the pins below; `scripts/precommit-baseline` then copies this content
+# into each repo's own .pre-commit-config.yaml between managed-baseline markers.
+#
+# Keep this to hooks every repo wants. Language-specific hooks (yamllint,
+# ansible-lint, shellcheck, ruff, terraform_fmt, ...) stay in each repo.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ["--allow-multiple-documents", "--unsafe"]
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      # Mac/Linux/Windows hygiene: mixed line endings ("auto" only fixes files
+      # that mix them; it never converts a consistently-CRLF file) and
+      # filenames that differ only by case.
+      - id: mixed-line-ending
+      - id: check-case-conflict
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
