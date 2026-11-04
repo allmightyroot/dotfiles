@@ -1,0 +1,2 @@
+# Repos (path relative to ~/.repos/mygit, or bare repo name) that renovate-onboard ignores.
+renovate-config   # it is the shared preset itself; a self-extending renovate.json adds nothing

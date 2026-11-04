@@ -1,2 +1,1 @@
 # Repos (path relative to ~/.repos/mygit, or bare repo name) that precommit-baseline ignores.
-renovate-config   # it is the shared preset itself; a self-extending renovate.json adds nothing

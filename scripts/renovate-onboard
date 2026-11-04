@@ -19,8 +19,8 @@ Usage:
   renovate-onboard --repo PATH     only this repo (repeatable)
   renovate-onboard --no-bot-check  skip the glab membership lookup
 
-Repos listed in ../precommit-baseline/skip.txt are ignored (shared with
-precommit-baseline).
+Repos listed in ../precommit-baseline/skip-renovate.txt are ignored (separate from
+precommit-baseline's skip.txt, so skipping one tool does not skip the other).
 """
 import argparse
 import fnmatch
@@ -33,11 +33,11 @@ import sys
 from pathlib import Path
 
 HERE = Path(os.path.realpath(__file__)).parent
-SKIP_FILE = HERE.parent / "precommit-baseline" / "skip.txt"
+SKIP_FILE = HERE.parent / "precommit-baseline" / "skip-renovate.txt"
 PRESET = "local>amr-sys-admin/renovate-config"
 BOT = "renovate-bot-amr"
 COMMIT_MSG = "chore: add Renovate config [ci skip]"
-PRUNE = {".git", "attic", "node_modules"}
+PRUNE = {".git", "archive", "attic", "node_modules"}
 CONFIG_NAMES = ["renovate.json", "renovate.json5", ".renovaterc", ".renovaterc.json",
                 ".gitlab/renovate.json", ".github/renovate.json"]
 BODY = {
@@ -147,7 +147,9 @@ def main():
             note = c.stderr.strip()
         else:
             note = ""
-        rows.append((name, status, note if args.commit else ""))
+        # Only surface git's output when the commit failed; on success it is just
+        # pre-commit hook chatter that swamps the table.
+        rows.append((name, status, note if status == "commit-failed" else ""))
 
     width = max((len(r[0]) for r in rows), default=10)
     print(f"{'repo'.ljust(width)}  status")
