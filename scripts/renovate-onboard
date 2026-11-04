@@ -1,0 +1,162 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.9"
+# ///
+"""Add a minimal renovate.json to repos that the self-hosted Renovate runner covers.
+
+A repo is a candidate when it has a .pre-commit-config.yaml, an origin on
+gitlab.com whose namespace matches the runner's autodiscoverFilter (read from
+renovate-runner/config.js), and no Renovate config yet. Repos where
+renovate-bot-amr is not at least a Developer are reported and skipped, because
+a renovate.json there would do nothing.
+
+Safe by default: with no flags this only reports.
+
+Usage:
+  renovate-onboard                 report (dry run)
+  renovate-onboard --apply         write renovate.json (no git operations)
+  renovate-onboard --commit        --apply, then commit just that file; never pushes
+  renovate-onboard --repo PATH     only this repo (repeatable)
+  renovate-onboard --no-bot-check  skip the glab membership lookup
+
+Repos listed in ../precommit-baseline/skip.txt are ignored (shared with
+precommit-baseline).
+"""
+import argparse
+import fnmatch
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(os.path.realpath(__file__)).parent
+SKIP_FILE = HERE.parent / "precommit-baseline" / "skip.txt"
+PRESET = "local>amr-sys-admin/renovate-config"
+BOT = "renovate-bot-amr"
+COMMIT_MSG = "chore: add Renovate config [ci skip]"
+PRUNE = {".git", "attic", "node_modules"}
+CONFIG_NAMES = ["renovate.json", "renovate.json5", ".renovaterc", ".renovaterc.json",
+                ".gitlab/renovate.json", ".github/renovate.json"]
+BODY = {
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [PRESET],
+}
+
+
+def discover(root):
+    repos = []
+    for dirpath, dirnames, _ in os.walk(root):
+        if ".git" in dirnames or os.path.isfile(os.path.join(dirpath, ".git")):
+            repos.append(Path(dirpath))
+            dirnames[:] = []
+            continue
+        dirnames[:] = [d for d in dirnames if d not in PRUNE]
+        if len(Path(dirpath).relative_to(root).parts) >= 3:
+            dirnames[:] = []
+    return sorted(repos)
+
+
+def covered_globs(root):
+    cfg = Path(root) / "renovate-runner" / "config.js"
+    if not cfg.is_file():
+        sys.exit(f"cannot read the runner's autodiscoverFilter: {cfg} is missing")
+    m = re.search(r"autodiscoverFilter:\s*\[(.*?)\]", cfg.read_text(), re.S)
+    globs = re.findall(r"'([^']+)'", m.group(1)) if m else []
+    if not globs:
+        sys.exit(f"no autodiscoverFilter entries found in {cfg}")
+    return globs
+
+
+def load_skip():
+    if not SKIP_FILE.exists():
+        return set()
+    return {l.split("#")[0].strip() for l in SKIP_FILE.read_text().splitlines()
+            if l.split("#")[0].strip()}
+
+
+def git(repo, *a):
+    return subprocess.run(["git", "-C", str(repo), *a], capture_output=True, text=True)
+
+
+def gitlab_path(repo):
+    url = git(repo, "remote", "get-url", "origin").stdout.strip()
+    m = re.match(r"^(?:git@gitlab\.com:|https://gitlab\.com/)(.+?)(?:\.git)?$", url)
+    return m.group(1) if m else None
+
+
+def bot_level(path):
+    if not shutil.which("glab"):
+        return "unknown"
+    r = subprocess.run(["glab", "api", f"projects/{path.replace('/', '%2F')}/members/all?query={BOT}"],
+                       capture_output=True, text=True)
+    try:
+        data = json.loads(r.stdout)
+    except ValueError:
+        return "unknown"
+    return str(data[0]["access_level"]) if data else "none"
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Add renovate.json to covered repos.")
+    ap.add_argument("--root", default=os.path.expanduser("~/.repos/mygit"))
+    ap.add_argument("--repo", action="append", default=[])
+    ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--commit", action="store_true")
+    ap.add_argument("--no-bot-check", action="store_true")
+    args = ap.parse_args()
+
+    root = Path(args.root).resolve()
+    globs = covered_globs(root)
+    skip = load_skip()
+    repos = [Path(r).resolve() for r in args.repo] if args.repo else discover(root)
+    write = args.apply or args.commit
+
+    rows = []
+    for repo in repos:
+        try:
+            name = str(repo.relative_to(root))
+        except ValueError:
+            name = str(repo)
+        if name in skip or repo.name in skip:
+            rows.append((name, "skipped", "")); continue
+        if not (repo / ".pre-commit-config.yaml").is_file():
+            continue  # not interesting: no pre-commit config
+        path = gitlab_path(repo)
+        if path is None:
+            rows.append((name, "no-gitlab", "origin is not on gitlab.com")); continue
+        if not any(fnmatch.fnmatch(path, g) for g in globs):
+            rows.append((name, "not-covered", f"{path} is outside the runner's filter")); continue
+        if any((repo / c).is_file() for c in CONFIG_NAMES):
+            rows.append((name, "has-config", "")); continue
+        if not args.no_bot_check:
+            lvl = bot_level(path)
+            if lvl in ("none",) or (lvl.isdigit() and int(lvl) < 30):
+                rows.append((name, "no-bot", f"{BOT} is not a Developer on {path}")); continue
+        target = repo / "renovate.json"
+        if not write:
+            rows.append((name, "would-add", path)); continue
+        target.write_text(json.dumps(BODY, indent=2) + "\n")
+        status = "added"
+        if args.commit:
+            git(repo, "add", "renovate.json")
+            c = git(repo, "commit", "-m", COMMIT_MSG, "--", "renovate.json")
+            status = "committed" if c.returncode == 0 else "commit-failed"
+            note = c.stderr.strip()
+        else:
+            note = ""
+        rows.append((name, status, note if args.commit else ""))
+
+    width = max((len(r[0]) for r in rows), default=10)
+    print(f"{'repo'.ljust(width)}  status")
+    for n, s, note in rows:
+        print(f"{n.ljust(width)}  {s}" + (f"  {note}" if note else ""))
+    if not write and any(r[1] == "would-add" for r in rows):
+        print("\nDry run only. Re-run with --apply (or --commit) to write.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
