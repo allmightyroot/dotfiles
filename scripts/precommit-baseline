@@ -1,0 +1,365 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.9"
+# ///
+"""Sync the shared pre-commit baseline into every repo's .pre-commit-config.yaml.
+
+The master copy is ../precommit-baseline/.pre-commit-config.yaml (Renovate bumps
+its pins). Each repo keeps its own config; the baseline hooks live between two
+marker comments and are rewritten from the master, everything outside the
+markers is left alone:
+
+    repos:
+      # >>> BEGIN managed baseline ...
+      - repo: https://github.com/pre-commit/pre-commit-hooks
+      ...
+      # <<< END managed baseline
+      - repo: <repo-specific hooks>
+
+First run on a repo that has no markers yet: its existing entries for the
+baseline repos (pre-commit-hooks, gitleaks) are replaced by the block. If those
+entries carry settings the baseline does not (extra args, exclude, files), the
+repo is reported as "custom" and left alone unless --force is given.
+
+Safe by default: with no flags this only reports and prints diffs.
+
+Usage:
+  precommit-baseline                   report + diffs for every repo (dry run)
+  precommit-baseline --check           quiet; exit 1 if any repo needs attention
+  precommit-baseline --apply           write the changes (no git operations)
+  precommit-baseline --commit          --apply, then one commit per repo (never pushes)
+  precommit-baseline --repo PATH ...   only these repos (also for --check)
+
+Repos listed in ../precommit-baseline/skip.txt are ignored. Repos without a
+.pre-commit-config.yaml are listed but not touched.
+"""
+import argparse
+import difflib
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+BEGIN_TAG = "# >>> BEGIN managed baseline"
+END_TAG = "# <<< END managed baseline"
+BEGIN_LINE = (BEGIN_TAG + ": edit dotfiles/precommit-baseline/.pre-commit-config.yaml, "
+              "then run precommit-baseline")
+# GitLab skips pipelines for "[ci skip]" / "[skip ci]". Confirm against the GitLab
+# docs for your instance before relying on it.
+COMMIT_MSG = "chore(pre-commit): sync shared baseline [ci skip]"
+CONFIG_NAME = ".pre-commit-config.yaml"
+PRUNE = {".git", "attic", "node_modules"}
+ENTRY_RE = re.compile(r"^(\s*)-\s+repo:\s*(\S+)")
+
+HERE = Path(os.path.realpath(__file__)).parent
+MASTER_DIR = HERE.parent / "precommit-baseline"
+
+
+def split_entries(lines):
+    """Return (repos_idx, entries); entries = [(start, end_exclusive, indent, url)]."""
+    repos_idx = next((i for i, l in enumerate(lines) if re.match(r"^repos:\s*(#.*)?$", l)), None)
+    if repos_idx is None:
+        return None, []
+    starts = []
+    for i in range(repos_idx + 1, len(lines)):
+        m = ENTRY_RE.match(lines[i])
+        if m:
+            starts.append((i, m.group(1), m.group(2)))
+    entries = []
+    for n, (i, indent, url) in enumerate(starts):
+        limit = starts[n + 1][0] if n + 1 < len(starts) else len(lines)
+        end = i + 1
+        for j in range(i + 1, limit):
+            line = lines[j]
+            stripped = line.strip()
+            if stripped and not line.startswith(indent + " ") and not stripped.startswith("#"):
+                break  # a new top-level key (e.g. ci:) ends the list
+            end = j + 1
+        # Trailing blank/comment lines belong to whatever follows, not to this entry.
+        while end > i + 1 and (not lines[end - 1].strip() or lines[end - 1].strip().startswith("#")):
+            end -= 1
+        entries.append((i, end, indent, url))
+    return repos_idx, entries
+
+
+HOOK_RE = re.compile(r"^(\s*)-\s+id:\s*(\S+)")
+
+
+def norm(lines):
+    """Whitespace/quote-insensitive form of a hook block, ignoring comments."""
+    out = []
+    for l in lines:
+        t = l.strip()
+        if t and not t.startswith("#"):
+            out.append(re.sub(r"\s+", " ", t.replace('"', "").replace("'", "")))
+    return " | ".join(out)
+
+
+def args_of(lines):
+    """Return (set of args, other normalized lines) for a hook block, or None if args aren't a flow list."""
+    args, other = set(), []
+    for l in lines:
+        t = re.sub(r"\s+", " ", l.strip().replace('"', "").replace("'", ""))
+        if not t or t.startswith("#"):
+            continue
+        m = re.match(r"^args: \[(.*)\]$", t)
+        if m:
+            args = {a.strip() for a in m.group(1).split(",") if a.strip()}
+        elif t.startswith("args:"):
+            return None
+        else:
+            other.append(t)
+    return args, other
+
+
+def compatible(repo_hook, master_hook):
+    """True if the repo's hook adds nothing the master lacks (args may be a subset)."""
+    a, b = args_of(repo_hook), args_of(master_hook)
+    if a is None or b is None:
+        return norm(repo_hook) == norm(master_hook)
+    return a[1] == b[1] and a[0] <= b[0]
+
+
+def parse_entry(lines, s, e):
+    """Split one repo entry into (rev, entry_level_extras, {hook_id: [lines]}, order)."""
+    rev, entry_extra, hooks, order = None, [], {}, []
+    hooks_at = next((i for i in range(s, e) if re.match(r"^\s*hooks:\s*$", lines[i])), None)
+    head_end = hooks_at if hooks_at is not None else e
+    for l in lines[s + 1:head_end]:
+        t = l.strip()
+        if t.startswith("rev:"):
+            rev = t.split(":", 1)[1].strip()
+        elif t and not t.startswith("#"):
+            entry_extra.append(t)
+    if hooks_at is None:
+        return rev, entry_extra, hooks, order, False
+    cur = None
+    for l in lines[hooks_at + 1:e]:
+        m = HOOK_RE.match(l)
+        if m:
+            cur = m.group(2)
+            hooks[cur] = [l]
+            order.append(cur)
+        elif cur is not None:
+            hooks[cur].append(l)
+        elif l.strip() and not l.strip().startswith("#"):
+            return rev, entry_extra, hooks, order, False  # flow-style or unparsable
+    return rev, entry_extra, hooks, order, True
+
+
+def load_master():
+    path = MASTER_DIR / CONFIG_NAME
+    lines = path.read_text().splitlines()
+    _, entries = split_entries(lines)
+    if not entries:
+        sys.exit(f"no repo entries found in {path}")
+    out, info = [], {}
+    for n, (s, e, indent, url) in enumerate(entries):
+        if n:
+            out.append("")
+        out.extend(l[len(indent):] if l.startswith(indent) else l for l in lines[s:e])
+        rev, _, hooks, _, _ = parse_entry(lines, s, e)
+        info[url] = {"rev": rev, "hooks": {h: norm(v) for h, v in hooks.items()},
+                     "raw": hooks}
+    return out, info
+
+
+def build_block(master_lines, indent):
+    pad = indent
+    return ([pad + BEGIN_LINE]
+            + [(pad + l) if l else "" for l in master_lines]
+            + [pad + END_TAG])
+
+
+def sync_extra_revs(lines, info, skip_range):
+    """Keep rev: of baseline-repo entries outside the managed block equal to the master."""
+    _, entries = split_entries(lines)
+    for (s, e, _, url) in entries:
+        if url not in info or skip_range[0] <= s <= skip_range[1]:
+            continue
+        for i in range(s, e):
+            m = re.match(r"^(\s*rev:\s*)\S+(.*)$", lines[i])
+            if m:
+                lines[i] = m.group(1) + info[url]["rev"] + m.group(2)
+                break
+    return lines
+
+
+def compute(text, master_lines, info, force):
+    """Return (status, new_text, note). status: ok|drift|adopt|custom|invalid."""
+    lines = text.split("\n")
+    trailing = text.endswith("\n")
+    if trailing:
+        lines = lines[:-1]
+    repos_idx, entries = split_entries(lines)
+    if repos_idx is None:
+        return "invalid", text, "no top-level 'repos:' key"
+
+    b = next((i for i, l in enumerate(lines) if BEGIN_TAG in l), None)
+    e = next((i for i, l in enumerate(lines) if END_TAG in l), None)
+    if b is not None and e is not None and e > b:
+        indent = re.match(r"\s*", lines[b]).group(0)
+        block = build_block(master_lines, indent)
+        new = lines[:b] + block + lines[e + 1:]
+        new = sync_extra_revs(new, info, (b, b + len(block) - 1))
+        status = "ok"
+    elif b is not None or e is not None:
+        return "invalid", text, "only one of the BEGIN/END markers is present"
+    else:
+        indent = entries[0][2] if entries else "  "
+        mine = [en for en in entries if en[3] in info]
+        conflicts, extras = [], []  # extras: (url, [hook line groups])
+        for (s, t, ind, url) in mine:
+            rev, entry_extra, hooks, order, ok = parse_entry(lines, s, t)
+            if not ok:
+                conflicts.append(f"{url}: unparsable hooks list")
+                continue
+            for x in entry_extra:
+                conflicts.append(f"{url.rsplit('/', 1)[-1]}: entry-level '{x}'")
+            keep = []
+            for hid in order:
+                if hid in info[url]["hooks"]:
+                    # A bare "- id: x" has no settings of its own, so the baseline's
+                    # version wins; args that are a subset of the baseline's also
+                    # win. Only settings the baseline lacks count as a conflict.
+                    if not compatible(hooks[hid], info[url]["raw"][hid]):
+                        conflicts.append(f"{hid} differs from baseline ({norm(hooks[hid])})")
+                else:
+                    keep.append(hooks[hid])
+            if keep:
+                extras.append((url, ind, keep))
+        if conflicts and not force:
+            return "custom", text, "; ".join(conflicts)
+        drop = set()
+        for (s, t, _, _) in mine:
+            drop.update(range(s, t))
+        kept = [l for i, l in enumerate(lines) if i not in drop]
+        block = build_block(master_lines, indent)
+        extra_lines = []
+        for (url, ind, keep) in extras:
+            extra_lines += ["", f"{ind}- repo: {url}", f"{ind}  rev: {info[url]['rev']}", f"{ind}  hooks:"]
+            for h in keep:
+                extra_lines += h
+        at = repos_idx + 1
+        rest = kept[at:]
+        new = kept[:at] + block + extra_lines + ([""] if rest and rest[0].strip() else []) + rest
+        collapsed = []
+        for l in new:
+            if not l.strip() and collapsed and not collapsed[-1].strip():
+                continue
+            collapsed.append(l)
+        new = collapsed
+        status = "adopt"
+
+    out = "\n".join(new) + ("\n" if trailing else "")
+    if out == text:
+        return "ok", text, ""
+    return ("drift" if status == "ok" else status), out, ""
+
+
+def discover(root):
+    repos = []
+    for dirpath, dirnames, _ in os.walk(root):
+        depth = Path(dirpath).relative_to(root).parts
+        if ".git" in dirnames or os.path.isfile(os.path.join(dirpath, ".git")):
+            repos.append(Path(dirpath))
+            dirnames[:] = []
+            continue
+        dirnames[:] = [d for d in dirnames if d not in PRUNE]
+        if len(depth) >= 3:
+            dirnames[:] = []
+    return sorted(repos)
+
+
+def load_skip():
+    path = MASTER_DIR / "skip.txt"
+    if not path.exists():
+        return set()
+    return {l.split("#")[0].strip() for l in path.read_text().splitlines() if l.split("#")[0].strip()}
+
+
+def label(repo, root):
+    try:
+        return str(repo.relative_to(root))
+    except ValueError:
+        return str(repo)
+
+
+def git(repo, *args):
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Sync the shared pre-commit baseline.")
+    ap.add_argument("--root", default=os.path.expanduser("~/.repos/mygit"))
+    ap.add_argument("--repo", action="append", default=[], help="only this repo (repeatable)")
+    ap.add_argument("--check", action="store_true", help="quiet; exit 1 if anything needs attention")
+    ap.add_argument("--apply", action="store_true", help="write changes")
+    ap.add_argument("--commit", action="store_true", help="--apply, then commit each changed repo")
+    ap.add_argument("--force", action="store_true", help="adopt even when custom settings would be dropped")
+    args = ap.parse_args()
+
+    root = Path(args.root).resolve()
+    master_lines, info = load_master()
+    skip = load_skip()
+    repos = [Path(r).resolve() for r in args.repo] if args.repo else discover(root)
+    write = args.apply or args.commit
+
+    rows, attention = [], False
+    for repo in repos:
+        name = label(repo, root)
+        cfg = repo / CONFIG_NAME
+        if name in skip or repo.name in skip:
+            rows.append((name, "skipped", ""))
+            continue
+        if not cfg.is_file():
+            rows.append((name, "no-config", ""))
+            continue
+        old = cfg.read_text()
+        status, new, note = compute(old, master_lines, info, args.force)
+        if status != "ok":
+            attention = True
+        rows.append((name, status, note))
+        if status in ("drift", "adopt"):
+            if not args.check and not write:
+                sys.stdout.writelines(difflib.unified_diff(
+                    old.splitlines(True), new.splitlines(True),
+                    f"a/{name}/{CONFIG_NAME}", f"b/{name}/{CONFIG_NAME}"))
+            if write:
+                if git(repo, "status", "--porcelain", "--", CONFIG_NAME).stdout.strip():
+                    rows[-1] = (name, "dirty", f"{CONFIG_NAME} has uncommitted changes; not touched")
+                    continue
+                cfg.write_text(new)
+                if shutil.which("pre-commit"):
+                    v = subprocess.run(["pre-commit", "validate-config", str(cfg)],
+                                       capture_output=True, text=True)
+                    if v.returncode != 0:
+                        cfg.write_text(old)
+                        rows[-1] = (name, "invalid", "pre-commit rejected the result; restored: "
+                                    + v.stdout.strip() + v.stderr.strip())
+                        continue
+                rows[-1] = (name, "applied", note)
+                if args.commit:
+                    c = git(repo, "commit", "-m", COMMIT_MSG, "--", CONFIG_NAME)
+                    rows[-1] = (name, "committed" if c.returncode == 0 else "commit-failed",
+                                c.stderr.strip())
+
+    if args.check:
+        bad = [r for r in rows if r[1] in ("drift", "adopt", "custom", "invalid")]
+        for n, s, note in bad:
+            print(f"{n}: baseline {s}" + (f" ({note})" if note else ""))
+        return 1 if bad else 0
+
+    width = max((len(r[0]) for r in rows), default=10)
+    print(f"{'repo'.ljust(width)}  status")
+    for n, s, note in rows:
+        print(f"{n.ljust(width)}  {s}" + (f"  {note}" if note else ""))
+    if not write and attention:
+        print("\nDry run only. Re-run with --apply (or --commit) to write.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

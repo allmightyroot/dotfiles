@@ -1,0 +1,14 @@
+# Global mise tools for personal machines. Link it into place with:
+#   ln -sfn ~/.repos/mygit/dotfiles/mise/config.toml ~/.config/mise/config.toml
+#
+# mise merges this with each repo's own .mise.toml and the closer file wins, so
+# repos such as infra-tools keep their own pinned versions.
+#
+# Deliberately short:
+#   - pre-commit and uv come from the Brewfiles, not mise.
+#   - Project tools (terraform, opentofu, terragrunt, ...) belong in the repo's
+#     .mise.toml, never here.
+#   - Security scanners stay on latest.
+[tools]
+gitleaks = "latest"
+packer = "1.16.0"
