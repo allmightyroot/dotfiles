@@ -50,7 +50,7 @@ BEGIN_LINE = (BEGIN_TAG + ": edit dotfiles/precommit-baseline/.pre-commit-config
 # docs for your instance before relying on it.
 COMMIT_MSG = "chore(pre-commit): sync shared baseline [ci skip]"
 CONFIG_NAME = ".pre-commit-config.yaml"
-PRUNE = {".git", "attic", "node_modules"}
+PRUNE = {".git", "archive", "attic", "node_modules"}
 ENTRY_RE = re.compile(r"^(\s*)-\s+repo:\s*(\S+)")
 
 HERE = Path(os.path.realpath(__file__)).parent
@@ -343,8 +343,9 @@ def main():
                 rows[-1] = (name, "applied", note)
                 if args.commit:
                     c = git(repo, "commit", "-m", COMMIT_MSG, "--", CONFIG_NAME)
+                    # git's output on success is just pre-commit hook chatter.
                     rows[-1] = (name, "committed" if c.returncode == 0 else "commit-failed",
-                                c.stderr.strip())
+                                "" if c.returncode == 0 else c.stderr.strip()[-300:])
 
     if args.check:
         bad = [r for r in rows if r[1] in ("drift", "adopt", "custom", "invalid")]
