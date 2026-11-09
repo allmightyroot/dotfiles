@@ -14,7 +14,6 @@ cask "1password-cli"
 
 brew "aoe"
 brew "argocd"
-brew "atuin"
 brew "awscli"
 brew "cloudflare-speed-cli"
 brew "cloudflare-wrangler"
