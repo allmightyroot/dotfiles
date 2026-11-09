@@ -45,9 +45,6 @@ if command -v mise &>/dev/null; then
 fi
 export KUBECONFIG=~/.kube/config
 
-# Atuin
-command -v atuin &>/dev/null && eval "$(atuin init zsh --disable-up-arrow)"
-
 # 1Password Service Account token
 if [[ -r "$HOME/.config/op/service-account-token" ]]; then
   export OP_SERVICE_ACCOUNT_TOKEN="$(cat "$HOME/.config/op/service-account-token")"
