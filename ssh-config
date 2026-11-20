@@ -1,7 +1,23 @@
-# Suppress banners
-LogLevel QUIET
+# Git hosts: no multiplexing. A stale persistent master hung every GitHub connection
+# (2026-11-19) and each git operation is one connection, so multiplexing buys nothing.
+# ssh uses the FIRST value it finds for an option, so this block must stay above the
+# Host * defaults below.
+Host github.com ssh.github.com gitlab.com ssh.bitbucket.org bitbucket.org
+    ControlMaster no
+    ControlPath none
 
-# Enable ssh multiplexing
-ControlMaster auto
-ControlPath /tmp/%C
-ControlPersist 4h
+Host *
+    # Suppress banners
+    LogLevel QUIET
+
+    # Enable ssh multiplexing
+    ControlMaster auto
+    ControlPath /tmp/%C
+    ControlPersist 4h
+
+# shared-ingress ProxyGroup pods advertise a tailnet IPv6 address that's
+# blackholed, so SSH tries it first and hangs for the full connect timeout
+# before falling back to IPv4 (which works instantly). Force IPv4 here until
+# the underlying IPv6 path on those pods is fixed.
+Host *.example.ts.net
+    AddressFamily inet
