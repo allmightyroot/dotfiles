@@ -46,7 +46,6 @@ unixorn/git-extra-commands
 
 # My stuff
 allmightyroot/zshdotfiles
-allmightyroot/zshdotfiles.mac
 
 # Theme (must be loaded after oh-my-zsh lib)
 ohmyzsh/ohmyzsh path:themes/afowler.zsh-theme
