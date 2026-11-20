@@ -10,3 +10,5 @@
 	up = pull --rebase --autostash
 [init]
 	defaultBranch = main
+[pull]
+	rebase = true
