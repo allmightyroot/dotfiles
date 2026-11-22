@@ -30,9 +30,9 @@ Commands:
     merge DUP LINK [--delete]       copy DUP's PDF onto LINK; with --delete, then delete DUP
 
 Examples:
-    linkwarden-attach find recipe                                   # get link ids
-    linkwarden-attach attach 3 article.pdf --dry-run                # add a PDF to link 3
-    linkwarden-attach attach https://site/page article.pdf          # ...or match by exact URL
+    linkwarden-attach find recipe                                 # get link ids
+    linkwarden-attach attach 3 article.pdf --dry-run              # add a PDF to link 3
+    linkwarden-attach attach https://site/page article.pdf        # ...or match by exact URL
     linkwarden-attach new "Old Article.pdf" \\
         --url https://dead-site.example/article --name "Old Article" \\
         --description "page is gone" --tag recipes --tag archive --collection Reading
@@ -40,7 +40,7 @@ Examples:
     linkwarden-attach merge 12 3 --delete                         # ...then delete 12 (asks first)
     linkwarden-attach batch manifest.tsv --tag recipes --collection Reading
         # manifest.tsv (tab-separated):
-        #   3                 article.pdf               <- attach to link 3
+        #   3                 article.pdf             <- attach to link 3
         #   -                 gone.pdf   https://x/y  <- new link, dead URL recorded
         #   -                 scan.png                <- new link, no URL
 
