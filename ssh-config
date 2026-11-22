@@ -19,5 +19,5 @@ Host *
 # blackholed, so SSH tries it first and hangs for the full connect timeout
 # before falling back to IPv4 (which works instantly). Force IPv4 here until
 # the underlying IPv6 path on those pods is fixed.
-Host *.example.ts.net
+Host *.ts.net
     AddressFamily inet

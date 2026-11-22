@@ -1,0 +1,325 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["requests"]
+# ///
+"""Attach PDFs (or HTML/PNG/JPEG) to existing Linkwarden links, and merge duplicates.
+
+Why: Linkwarden's UI "Upload File" always creates a NEW link; it cannot attach a file to
+an existing one. The API can (POST /api/v1/archives/{linkId}?format=N, multipart field
+"file"). Verified against the v2.17.0 source; format: 0=png 1=jpeg 2=pdf 4=html(monolith).
+
+Auth: create an access token in Linkwarden (Settings -> Access Tokens). Config is read from
+environment variables first, then from ~/.config/linkwarden-attach/env (KEY=VALUE lines;
+`linkwarden-attach --setup` prompts for the values and writes it with mode 600):
+    LINKWARDEN_TOKEN=...                   # never pass it on the command line
+    LINKWARDEN_URL=https://linkwarden.example.ts.net   # your instance; no default (repo is public)
+
+Options:
+    --version                       print the script version
+    --setup                         prompt for URL and token, write the config file
+
+Commands:
+    find TEXT                       search links (name/url/description/tag), show ids + formats
+    attach LINK FILE                attach FILE to LINK (link id, or URL; URL must match one link)
+    new FILE [--url U] [--name N] [--description D] [--tag T]... [--collection C]
+                                    create a NEW link from a file, for pages that no longer
+                                    exist (the UI's Upload File, plus URL/tags/collection)
+    batch MANIFEST                  tab-separated lines "LINK<TAB>FILE" ("#" comments allowed);
+                                    use "-" as LINK to create a new link: "-<TAB>FILE[<TAB>URL]"
+    merge DUP LINK [--delete]       copy DUP's PDF onto LINK; with --delete, then delete DUP
+
+Examples:
+    linkwarden-attach find recipe                                   # get link ids
+    linkwarden-attach attach 3 article.pdf --dry-run                # add a PDF to link 3
+    linkwarden-attach attach https://site/page article.pdf          # ...or match by exact URL
+    linkwarden-attach new "Old Article.pdf" \\
+        --url https://dead-site.example/article --name "Old Article" \\
+        --description "page is gone" --tag recipes --tag archive --collection Reading
+    linkwarden-attach merge 12 3 --dry-run                        # copy 12's PDF onto 3
+    linkwarden-attach merge 12 3 --delete                         # ...then delete 12 (asks first)
+    linkwarden-attach batch manifest.tsv --tag recipes --collection Reading
+        # manifest.tsv (tab-separated):
+        #   3                 article.pdf               <- attach to link 3
+        #   -                 gone.pdf   https://x/y  <- new link, dead URL recorded
+        #   -                 scan.png                <- new link, no URL
+
+Source: dotfiles repo, scripts/linkwarden-attach (git@gitlab.com:allmightyroot/dotfiles.git);
+installed into ~/.local/bin by scripts/link-scripts.
+
+Notes:
+    * Uploading a PDF makes Linkwarden set that link's `preview` to "unavailable" (server
+      behaviour), so the thumbnail may disappear in the UI. The PDF itself is fine.
+    * Default max upload is 10 MB (server env NEXT_PUBLIC_MAX_FILE_BUFFER).
+    * Writes (attach/new/batch/merge) are skipped with --dry-run. Deletes always ask first.
+"""
+
+import argparse
+import getpass
+import mimetypes
+import os
+import sys
+from pathlib import Path
+
+import requests
+import urllib3.util.connection
+
+# Tailnet IPv6 (fd7a:...) times out from durnehviir while IPv4 answers in ms, and requests
+# tries IPv6 first (no happy eyeballs), waiting out the full timeout. Force IPv4.
+urllib3.util.connection.HAS_IPV6 = False
+
+VERSION = "1.1.0"  # bump on any behaviour change; see the Changelog in the dotfiles commit log
+
+FORMATS = {".png": 0, ".jpg": 1, ".jpeg": 1, ".pdf": 2, ".html": 4, ".htm": 4}
+MIME = {0: "image/png", 1: "image/jpeg", 2: "application/pdf", 4: "text/html"}
+PDF = 2
+
+
+ENV_FILE = Path.home() / ".config" / "linkwarden-attach" / "env"
+LEGACY_ENV_FILE = Path.home() / ".config" / "linkwarden-merge" / "env"  # pre-1.1.0 location
+
+
+def load_env_file() -> dict[str, str]:
+    """KEY=VALUE lines (optional `export `, optional quotes). Real env vars win."""
+    path = ENV_FILE
+    if not path.is_file() and LEGACY_ENV_FILE.is_file():
+        print(f"note: reading legacy config {LEGACY_ENV_FILE}; run `linkwarden-attach --setup` "
+              f"to write {ENV_FILE}", file=sys.stderr)
+        path = LEGACY_ENV_FILE
+    out: dict[str, str] = {}
+    if not path.is_file():
+        return out
+    if path.stat().st_mode & 0o077:
+        print(f"warning: {path} is readable by others; run: chmod 600 {path}", file=sys.stderr)
+    for line in path.read_text().splitlines():
+        line = line.strip().removeprefix("export ").strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        out[k.strip()] = v.strip().strip("\"'")
+    return out
+
+
+def setup():
+    """Prompt for URL and token, test them, write ENV_FILE with mode 600."""
+    if not sys.stdin.isatty():
+        sys.exit("--setup needs a terminal (it prompts, and reads the token without echo).")
+    cur = load_env_file()
+    if ENV_FILE.exists() and input(f"{ENV_FILE} exists. Overwrite? [y/N] ").strip().lower() != "y":
+        sys.exit("unchanged.")
+    default_url = cur.get("LINKWARDEN_URL", "")
+    url = input(f"Linkwarden URL [{default_url}]: " if default_url else "Linkwarden URL: ").strip() or default_url
+    if not url.startswith(("http://", "https://")) or url.count("://") != 1:
+        sys.exit(f"{url!r} is not a valid URL (expected one http:// or https:// prefix).")
+    token = getpass.getpass("Access token (Settings -> Access Tokens; input hidden): ").strip()
+    if not token:
+        sys.exit("no token entered; nothing written.")
+    r = requests.get(f"{url.rstrip('/')}/api/v1/collections",
+                     headers={"Authorization": f"Bearer {token}"}, timeout=30)
+    if r.status_code != 200:
+        sys.exit(f"test call failed ({r.status_code}); nothing written.")
+    ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(ENV_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(f"LINKWARDEN_URL={url.rstrip('/')}\nLINKWARDEN_TOKEN={token}\n")
+    os.chmod(ENV_FILE, 0o600)
+    print(f"wrote {ENV_FILE} (mode 600); connection OK.")
+
+
+def session() -> tuple[requests.Session, str]:
+    cfg = load_env_file()
+    token = os.environ.get("LINKWARDEN_TOKEN") or cfg.get("LINKWARDEN_TOKEN")
+    if not token:
+        sys.exit(f"Set LINKWARDEN_TOKEN in the environment or in {ENV_FILE} "
+                 "(Linkwarden: Settings -> Access Tokens).")
+    base = os.environ.get("LINKWARDEN_URL") or cfg.get("LINKWARDEN_URL")
+    if not base:
+        sys.exit(f"Set LINKWARDEN_URL in the environment or in {ENV_FILE} (or run --setup).")
+    s = requests.Session()
+    s.headers["Authorization"] = f"Bearer {token}"
+    return s, base.rstrip("/")
+
+
+def search(s, base, text):
+    r = s.get(f"{base}/api/v1/links", params={"searchQueryString": text, "sort": 0}, timeout=30)
+    r.raise_for_status()
+    return r.json()["response"]
+
+
+def resolve(s, base, ref: str) -> int:
+    """A link id (digits) or a URL that matches exactly one existing link."""
+    if ref.isdigit():
+        return int(ref)
+    hits = [x for x in search(s, base, ref) if x.get("url") == ref]
+    if len(hits) != 1:
+        sys.exit(f"{ref!r} matched {len(hits)} links by exact URL; use a link id (see `find`).")
+    return hits[0]["id"]
+
+
+def describe(link) -> str:
+    fmts = [n for n in ("image", "pdf", "monolith", "readable", "preview")
+            if link.get(n) and link[n] != "unavailable"]
+    return f"{link['id']:>5}  {(link.get('url') or '(file only)')[:70]:<70}  {','.join(fmts) or '-'}"
+
+
+def upload(s, base, link_id: int, data: bytes, fmt: int, name: str):
+    r = s.post(
+        f"{base}/api/v1/archives/{link_id}",
+        params={"format": fmt},
+        files={"file": (name, data, MIME[fmt])},
+        timeout=300,
+    )
+    if r.status_code != 200:
+        sys.exit(f"upload to link {link_id} failed: {r.status_code} {r.text[:300]}")
+
+
+def attach(s, base, ref, path, dry):
+    p = Path(path)
+    fmt = FORMATS.get(p.suffix.lower())
+    if fmt is None:
+        sys.exit(f"{p}: unsupported type (use {', '.join(FORMATS)}).")
+    link_id = resolve(s, base, ref)
+    size = p.stat().st_size
+    print(f"{'would attach' if dry else 'attaching'} {p.name} ({size/1e6:.1f} MB) -> link {link_id}")
+    if not dry:
+        upload(s, base, link_id, p.read_bytes(), fmt, p.name)
+
+
+def resolve_collection(s, base, ref: str) -> int:
+    """Collection id or exact name. Never let the server create one from a typo'd name."""
+    if ref.isdigit():
+        return int(ref)
+    r = s.get(f"{base}/api/v1/collections", timeout=30)
+    r.raise_for_status()
+    hits = [c for c in r.json()["response"] if c["name"] == ref]
+    if len(hits) != 1:
+        names = ", ".join(c["name"] for c in r.json()["response"])
+        sys.exit(f"collection {ref!r} matched {len(hits)}; existing: {names}")
+    return hits[0]["id"]
+
+
+def new_link(s, base, path, url=None, name=None, description=None, tags=(), collection=None, dry=False):
+    """Create a link from a local file (for pages that no longer exist), like the UI's Upload File
+    but with a URL/name/tags/collection. Same two steps the UI does: create link, then upload."""
+    p = Path(path)
+    fmt = FORMATS.get(p.suffix.lower())
+    if fmt is None:
+        sys.exit(f"{p}: unsupported type (use {', '.join(FORMATS)}).")
+    if fmt == 4 and not url:
+        sys.exit(f"{p}: an HTML file needs --url (Linkwarden has no URL-less HTML link type).")
+    body = {"type": {0: "image", 1: "image", 2: "pdf", 4: "url"}[fmt], "name": name or p.stem}
+    if url:
+        body["url"] = url
+    if description:
+        body["description"] = description
+    if tags:
+        body["tags"] = [{"name": t} for t in tags]
+    if collection:
+        body["collection"] = {"id": resolve_collection(s, base, collection)}
+    print(f"{'would create' if dry else 'creating'} link {body} + upload {p.name} ({p.stat().st_size/1e6:.1f} MB)")
+    if dry:
+        return
+    r = s.post(f"{base}/api/v1/links", json=body, timeout=60)
+    if r.status_code == 409:
+        sys.exit(f"{p.name}: a link with that URL already exists; use `attach` instead.")
+    if r.status_code != 200:
+        sys.exit(f"{p.name}: create failed: {r.status_code} {r.text[:300]}")
+    link_id = r.json()["response"]["id"]
+    try:
+        upload(s, base, link_id, p.read_bytes(), fmt, p.name)
+    except SystemExit as e:
+        sys.exit(f"{e}\nlink {link_id} was created WITHOUT the file; retry with `attach {link_id} {p}` or delete it.")
+    print(f"  -> link {link_id}")
+
+
+def cmd_new(a):
+    s, base = session()
+    new_link(s, base, a.file, a.url, a.name, a.description, a.tag, a.collection, a.dry_run)
+
+
+def cmd_find(a):
+    s, base = session()
+    for link in search(s, base, a.text):
+        print(describe(link))
+
+
+def cmd_attach(a):
+    s, base = session()
+    attach(s, base, a.link, a.file, a.dry_run)
+
+
+def cmd_batch(a):
+    s, base = session()
+    failures = 0
+    for n, line in enumerate(Path(a.manifest).read_text().splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        try:
+            ref, rest = line.split("\t", 1)
+            cols = [c.strip() for c in rest.split("\t")]
+            if ref.strip() == "-":  # new link from a file: "-<TAB>FILE[<TAB>URL]"
+                new_link(s, base, cols[0], url=cols[1] if len(cols) > 1 and cols[1] else None,
+                         tags=a.tag, collection=a.collection, dry=a.dry_run)
+            else:
+                attach(s, base, ref.strip(), cols[0], a.dry_run)
+        except SystemExit as e:  # keep going; report at the end
+            failures += 1
+            print(f"line {n}: {e}", file=sys.stderr)
+    if failures:
+        sys.exit(f"{failures} line(s) failed")
+
+
+def cmd_merge(a):
+    s, base = session()
+    dup, target = int(a.dup), resolve(s, base, a.link)
+    if dup == target:
+        sys.exit("DUP and LINK are the same link.")
+    r = s.get(f"{base}/api/v1/archives/{dup}", params={"format": PDF}, timeout=300)
+    if r.status_code != 200 or not r.content.startswith(b"%PDF"):
+        sys.exit(f"link {dup} has no readable PDF ({r.status_code}).")
+    print(f"{'would copy' if a.dry_run else 'copying'} PDF ({len(r.content)/1e6:.1f} MB) {dup} -> {target}")
+    if a.dry_run:
+        return
+    upload(s, base, target, r.content, PDF, f"{dup}.pdf")
+    if a.delete:
+        if input(f"Delete duplicate link {dup}? [y/N] ").strip().lower() != "y":
+            print("kept.")
+            return
+        d = s.delete(f"{base}/api/v1/links/{dup}", timeout=30)
+        print("deleted." if d.status_code == 200 else f"delete failed: {d.status_code} {d.text[:200]}")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"linkwarden-attach {VERSION}")
+    ap.add_argument("--setup", action="store_true", help="prompt for URL/token and write the config file")
+    sub = ap.add_subparsers(dest="cmd")
+
+    p = sub.add_parser("find"); p.add_argument("text"); p.set_defaults(fn=cmd_find)
+    p = sub.add_parser("attach"); p.add_argument("link"); p.add_argument("file")
+    p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_attach)
+    p = sub.add_parser("new"); p.add_argument("file")
+    p.add_argument("--url", help="original (possibly dead) URL to record on the link")
+    p.add_argument("--name"); p.add_argument("--description")
+    p.add_argument("--tag", action="append", default=[], help="repeatable")
+    p.add_argument("--collection", help="existing collection name or id (default: Unorganized)")
+    p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_new)
+    p = sub.add_parser("batch"); p.add_argument("manifest")
+    p.add_argument("--tag", action="append", default=[], help="applied to '-' (new) lines")
+    p.add_argument("--collection", help="applied to '-' (new) lines")
+    p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_batch)
+    p = sub.add_parser("merge"); p.add_argument("dup"); p.add_argument("link")
+    p.add_argument("--delete", action="store_true"); p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(fn=cmd_merge)
+
+    a = ap.parse_args()
+    if a.setup:
+        return setup()
+    if not a.cmd:
+        ap.print_help()
+        sys.exit(2)
+    a.fn(a)
+
+
+if __name__ == "__main__":
+    main()

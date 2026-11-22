@@ -15,6 +15,17 @@ repos:
     hooks:
       - id: gitleaks
 
+  # This repo is public: block private network details. gitleaks does not catch these.
+  # Allowed: example.ts.net placeholders and the generic *.ts.net wildcard.
+  - repo: local
+    hooks:
+      - id: no-private-network-refs
+        name: no tailnet names or private IPs
+        language: pygrep
+        entry: >-
+          (?<!\*)(?<!example)\.ts\.net\b|\b100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+\b|\b10\.0\.[0-9]+\.[0-9]+\b|\b192\.168\.[0-9]+\.[0-9]+\b
+        exclude: ^\.pre-commit-config\.yaml$
+
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1-1
     hooks:
