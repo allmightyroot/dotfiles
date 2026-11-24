@@ -44,6 +44,8 @@ if command -v mise &>/dev/null; then
   eval "$(mise completion zsh)"
 fi
 export KUBECONFIG=~/.kube/config
+# Host-specific, untracked overrides (e.g. extra kubeconfigs)
+[[ -r ~/.zshrc.local ]] && source ~/.zshrc.local
 
 # 1Password Service Account token
 if [[ -r "$HOME/.config/op/service-account-token" ]]; then
