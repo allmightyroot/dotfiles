@@ -80,7 +80,9 @@ run_rsync() {
   local src="$local_path" dst="$PEER:$remote_rel"
   if [[ $PULL -eq 1 ]]; then src="$PEER:$remote_rel"; dst="$local_path"; fi
   echo ">> $src -> $dst ${DRY[*]+"${DRY[*]}"}"
-  "$RSYNC" -aHu --info=stats2 ${DRY[@]+"${DRY[@]}"} "$@" "$src" "$dst"
+  # --mkpath creates missing parent dirs on the destination (a fresh host with no
+  # ~/.repos yet); it does nothing on a dry run, so -n still touches nothing.
+  "$RSYNC" -aHu --mkpath --info=stats2 ${DRY[@]+"${DRY[@]}"} "$@" "$src" "$dst"
 }
 
 run_rsync "$HOME/.repos/mygit/" ".repos/mygit/" ${DELETE[@]+"${DELETE[@]}"} "${EXCLUDES[@]}"
