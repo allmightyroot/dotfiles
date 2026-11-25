@@ -1,2 +1,3 @@
 # Repos (path relative to ~/.repos/mygit, or bare repo name) that precommit-baseline ignores.
 schneebie-portfolio   # GitHub-only repo with its own pre-commit config (--maxkb=1500 for images); the shared baseline would drop that limit
+dotfiles   # .gitignore holds an "Icon\r\r" line that the stock trailing-whitespace hook would break, so this repo excludes .gitignore from it
